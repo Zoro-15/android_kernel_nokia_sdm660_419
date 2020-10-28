@@ -57,6 +57,8 @@
 #include <linux/uaccess.h>
 #include <linux/crc8.h>
 #include <linux/fcntl.h>
+#include <linux/fs.h>
+#include <asm/segment.h>
 
 #include "tas2557.h"
 #include "tas2557-core.h"
@@ -1614,12 +1616,11 @@ struct fih_sns_reg_info_tail{
 // Description: 
 //      Write calibration data into FIH device_info
 // ----------------------------------------------------------------------------- 
-static int tas2557_load_calibration(struct tas2557_priv *pTAS2557,	char *pFileName)
+static int tas2557_load_calibration(struct tas2557_priv *pTAS2557, char *pFileName)
 {
 #if 0 // read calibration data from data/tas2557_cal.bin
 	int nResult = 0;
-  struct file *fp = NULL;
-	//int nFile;
+	struct file *nFile = NULL;
 	mm_segment_t fs;
 	unsigned char pBuffer[1000];
 	int nSize = 0;
@@ -1629,23 +1630,19 @@ static int tas2557_load_calibration(struct tas2557_priv *pTAS2557,	char *pFileNa
 
 	fs = get_fs();
 	set_fs(KERNEL_DS);
-	//nFile = sys_open(pFileName, O_RDONLY, 0);
-	//fp = filp_open(pFileName, O_RDONLY, 0);
-	fp = filp_open(pFileName, O_RDWR |O_NONBLOCK, 0);
-	
-  if (IS_ERR(fp)) {
-		dev_err(pTAS2557->dev, "Open file %s Error\r\n", pFileName);
-		set_fs(fs);
-    goto end;
-	}
+	nFile = filp_open(pFileName, O_RDONLY, 0);
 
 	dev_info(pTAS2557->dev, "TAS2557 calibration file = %s\n", pFileName);
-		
-	fp->f_op->llseek(fp, 0, SEEK_SET);
-  pos = fp->f_pos;
-  nSize = vfs_read(fp, (unsigned char __user *)&pBuffer, sizeof(pBuffer), &pos);
-
-  filp_close(fp, NULL);
+	if (IS_ERR(nFile)) {
+		if (PTR_ERR(nFile) == -ENOENT)
+			dev_err(pTAS2557->dev, "TAS2557 calibration file %s is not exit\n", pFileName);
+		else
+			dev_err(pTAS2557->dev, "TAS2557 cannot open calibration file: %s errno:%d\n", pFileName, (int)PTR_ERR(nFile));
+	} else {
+		pos = nFile->f_pos;
+		nSize = vfs_read(nFile, pBuffer, 1000, &pos);
+		filp_close(nFile, NULL);
+	}
 	set_fs(fs);
 
 	if (!nSize)
@@ -1661,11 +1658,9 @@ static int tas2557_load_calibration(struct tas2557_priv *pTAS2557,	char *pFileNa
 	if (nResult)
 		dev_err(pTAS2557->dev, "TAS2557 calibration file is corrupt\n");
 	else
-		dev_info(pTAS2557->dev, "TAS2557 calibration: %d calibrations\n",
-			pTAS2557->mpCalFirmware->mnCalibrations);
+		dev_info(pTAS2557->dev, "TAS2557 calibration: %d calibrations\n", pTAS2557->mpCalFirmware->mnCalibrations);
 
 end:
-
 	return nResult;
 
 #else //read calibration data from e2p
