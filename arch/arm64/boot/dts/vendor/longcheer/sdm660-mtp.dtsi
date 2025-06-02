@@ -15,7 +15,7 @@
 /* longcheer common includes */
 #include "longcheer-common-sdm660.dtsi"
 
-/ {
+&vendor {
 	mtp_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
 		#include "battery/fg-gen3-batterydata-m690-Veken-3500mAH.dtsi"

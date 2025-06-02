@@ -1,4 +1,4 @@
-/ {
+&vendor {
 	/delete-node/ qcom,battery-data;
 	fih_batterydata: qcom,battery-data {
 		qcom,batt-id-range-pct = <15>;
