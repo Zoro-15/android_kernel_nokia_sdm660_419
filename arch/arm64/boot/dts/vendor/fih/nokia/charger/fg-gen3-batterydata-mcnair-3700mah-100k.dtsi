@@ -9,6 +9,14 @@ qcom,3185852_fih_he347mcnair_3700mah_averaged_masterslave_nov7th2017 {
 	qcom,batt-id-kohm = <100>;
 	qcom,battery-beta = <3435>;
 	qcom,battery-type = "B2N_mcnair_3700mah_100k";
+	qcom,jeita-fcc-ranges = <0   150   600000
+				 151  450  2000000
+				 451 550  600000>;
+	qcom,jeita-fv-ranges = <0   150  4100000
+				151 450  4400000
+				451 550  4100000>;
+	qcom,step-chg-ranges = <3000000  4100000  2000000
+				4101000  4400000  1200000>;
 	qcom,checksum = <0xD0AB>;
 	qcom,gui-version = "PM660GUI - 0.0.0.45";
 	qcom,fg-profile-data = [
