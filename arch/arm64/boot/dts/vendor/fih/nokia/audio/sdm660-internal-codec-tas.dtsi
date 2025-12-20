@@ -102,16 +102,11 @@
 
 &pmic_analog_codec {
   status = "okay";
+  qcom,cdc-micbias-cfilt-mv = <1800000>;
 };
 
 &msm_sdw_codec {
   status = "okay";
-};
-
-&pm660l_3 {
-	pmic_analog_codec: analog-codec@f000 {
-		qcom,cdc-micbias-cfilt-mv = <1800000>;
-	};
 };
 
 &soc{
