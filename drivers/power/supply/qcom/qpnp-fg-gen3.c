@@ -237,6 +237,9 @@ struct fg_gen3_chip {
 	bool			esr_fcc_ctrl_en;
 	bool			esr_flt_cold_temp_en;
 	bool			slope_limit_en;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	bool 			rsense_rw; // FIHTDC, IdaChiang, add for DRG external sense issue
+#endif
 };
 
 static struct fg_sram_param pmi8998_v1_sram_params[] = {
@@ -863,7 +866,7 @@ static int fg_get_batt_profile(struct fg_dev *fg)
 
 #if defined(CONFIG_LONGCHEER_SDM660_PROJS)
 	// begin for the total capacity of batt
-	rc = of_property_read_u32(profile_node, "qcom,nom-batt-capacity-mah", &chip->battery_full_design);
+	rc = of_property_read_u32(profile_node, "qcom,nom-batt-capacity-mah", &fg->battery_full_design);
 	if (rc < 0) {
 		pr_err("No profile data available\n");
 		return -ENODATA;
@@ -4120,14 +4123,15 @@ static const struct power_supply_desc fg_psy_desc = {
 static ssize_t rsense_sel_show(struct device *dev,
 			       struct device_attribute *attr, char *buf)
 {
-	struct fg_chip *chip = dev_get_drvdata(dev);
+	struct fg_gen3_chip *chip = dev_get_drvdata(dev);
+	struct fg_dev *fg = &chip->fg;
 	u8 sel = 0;
 	int rc;
 
-	rc = fg_read(chip, BATT_INFO_IBATT_SENSING_CFG(chip), &sel, 1);
+	rc = fg_read(fg, BATT_INFO_IBATT_SENSING_CFG(fg), &sel, 1);
 	if (rc < 0) {
 		pr_err("failed to read addr=0x%04x, rc=%d\n",
-			BATT_INFO_IBATT_SENSING_CFG(chip), rc);
+			BATT_INFO_IBATT_SENSING_CFG(fg), rc);
 	}
 
 	pr_info("rsense_sel_show = %d\n", sel);
@@ -4138,7 +4142,8 @@ static ssize_t rsense_sel_store(struct device *dev,
 		struct device_attribute *attr, const char
 		*buf, size_t size)
 {
-	struct fg_chip *chip = dev_get_drvdata(dev);
+	struct fg_gen3_chip *chip = dev_get_drvdata(dev);
+	struct fg_dev *fg = &chip->fg;
 	int intval =0;
 	int rc;
 
@@ -4149,7 +4154,7 @@ static ssize_t rsense_sel_store(struct device *dev,
 		return -EINVAL;
 	}
 
-	rc = fg_masked_write(chip, BATT_INFO_IBATT_SENSING_CFG(chip),
+	rc = fg_masked_write(fg, BATT_INFO_IBATT_SENSING_CFG(fg),
 			SOURCE_SELECT_MASK, intval);
 	if (rc < 0) {
 		pr_err("Error in writing rsense_sel, rc=%d\n", rc);

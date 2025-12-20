@@ -2236,13 +2236,13 @@ int smblib_get_prop_safety_timer_enable(struct smb_charger *chg,
 int smblib_get_prop_battery_full_design(struct smb_charger *chg,
 				     union power_supply_propval *val)
 {
-	struct fg_chip *chip;
+	struct fg_dev *fg;
 
 	if (!chg->bms_psy)
 		return -EINVAL;
-	chip = power_supply_get_drvdata(chg->bms_psy);
-	if (chip->battery_full_design)
-		val->intval =  chip->battery_full_design;
+	fg = power_supply_get_drvdata(chg->bms_psy);
+	if (fg->battery_full_design)
+		val->intval =  fg->battery_full_design;
 	else
 		val->intval = 3500;
 	return 0;
@@ -4099,10 +4099,10 @@ void smblib_usb_plugin_locked(struct smb_charger *chg)
 #if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		if((chg->fih_qc_control_disable_mode) && (strstr(saved_command_line, "androidboot.mode=charger") == NULL))
 		{
-			if(wake_lock_active(&chg->lcm_control_wake_lock))
+			if (chg->lcm_control_wake_lock->active)
 			{
 				pr_err("%s lcm_ctrl_wake_lock off\n", __func__);
-				wake_unlock(&chg->lcm_control_wake_lock);
+				__pm_relax(chg->lcm_control_wake_lock);
 			}
 		}
 #endif
@@ -4511,10 +4511,10 @@ static void smblib_handle_apsd_done(struct smb_charger *chg, bool rising)
 		if((chg->real_charger_type == POWER_SUPPLY_TYPE_USB_HVDCP_3) || (chg->real_charger_type == POWER_SUPPLY_TYPE_USB_HVDCP)
 			 || (chg->real_charger_type == POWER_SUPPLY_TYPE_USB_DCP))
 		{
-			if(!wake_lock_active(&chg->lcm_control_wake_lock))
+			if (!chg->lcm_control_wake_lock->active)
 			{
 				pr_err("%s lcm_ctrl_wake_lock on\n", __func__);
-				wake_lock(&chg->lcm_control_wake_lock);
+				__pm_stay_awake(chg->lcm_control_wake_lock);
 			}
 		}
 	}
@@ -5728,7 +5728,7 @@ static void lcm_cur_ctrl_work(struct work_struct *work)
 				struct smb_charger,
 				lcm_cur_ctrl_work.work);
 
-	if(!wake_lock_active(&chip->lcm_control_wake_lock))
+	if (!chip->lcm_control_wake_lock->active)
 		goto out;
 
 	if(!(chip->fih_qc_control_disable_mode) || (strstr(saved_command_line, "androidboot.mode=charger") != NULL))
@@ -6296,7 +6296,7 @@ int smblib_init(struct smb_charger *chg)
 	chg->is_ambient_display = false;
 	if(chg->fih_lcm_on_off_cur_control)
 	{
-		wake_lock_init(&chg->lcm_control_wake_lock, WAKE_LOCK_SUSPEND, "lcm_ctrl_wake_lock");
+		chg->lcm_control_wake_lock = wakeup_source_register(chg->dev, "lcm_ctrl_wake_lock");
 		INIT_DELAYED_WORK(&chg->lcm_cur_ctrl_work, lcm_cur_ctrl_work);
 	}
 	INIT_DELAYED_WORK(&chg->charge_full_jeita_work, smblib_charge_full_jeita_work);

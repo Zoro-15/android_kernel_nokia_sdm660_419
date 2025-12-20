@@ -12,9 +12,6 @@
 #include <linux/extcon-provider.h>
 #include "storm-watch.h"
 #include "battery.h"
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
-#include <linux/wakelock.h>
-#endif
 
 enum print_reason {
 	PR_INTERRUPT	= BIT(0),
@@ -431,7 +428,7 @@ struct smb_charger {
 	bool		is_ambient_display;
 	int 	check_cnt;
 	int 	fih_qc_control_disable_mode;
-	struct wake_lock  lcm_control_wake_lock;
+	struct wakeup_source  *lcm_control_wake_lock;
 	bool 	fih_remove_health_over_voltage;
 #endif
 };
