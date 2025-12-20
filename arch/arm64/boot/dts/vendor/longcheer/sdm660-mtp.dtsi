@@ -173,7 +173,7 @@
 };
 
 &pm660l_wled {
-	qcom,led-strings-list = [00 01 02];
+	qcom,string-cfg = <7>;
 };
 
 &dsi_ft8719_tianma_fhdplus_video {

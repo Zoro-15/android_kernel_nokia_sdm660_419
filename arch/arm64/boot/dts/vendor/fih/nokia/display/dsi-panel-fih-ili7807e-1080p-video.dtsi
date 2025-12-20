@@ -259,8 +259,8 @@
 };
 
 &pm660l_wled {
-	qcom,fs-curr-ua = <20000>;
-	qcom,led-strings-list = [00 01];
+	qcom,fs-current-limit = <20000>;
+	qcom,string-cfg = <3>;
 	qcom,en-cabc;
 };
 
