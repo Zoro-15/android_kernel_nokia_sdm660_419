@@ -92,13 +92,13 @@ int fih_set_step_chg_hysteresis(int hysteresis, int mode)
 
 	switch(mode) {
 	case STEP_CHG_CFG:
-		step_chg_config.hysteresis = hysteresis;
+		the_chip->step_chg_config->param.hysteresis = hysteresis;
 		break;
 	case JEITA_FCC_CFG:
-		jeita_fcc_config.hysteresis = hysteresis;
+		the_chip->jeita_fcc_config->param.hysteresis = hysteresis;
 		break;
 	case JEITA_FV_CFG:
-		jeita_fv_config.hysteresis = hysteresis;
+		the_chip->jeita_fv_config->param.hysteresis = hysteresis;
 		break;
 	default:
 		break;
@@ -117,25 +117,25 @@ int fih_set_step_chg_cfg(int *cfg, int cfg_len, int mode)
 	case STEP_CHG_CFG:
 		for(i=0; i < cfg_len; i++)
 		{
-			step_chg_config.fcc_cfg[i].low_threshold = cfg[i*3];
-			step_chg_config.fcc_cfg[i].high_threshold = cfg[i*3 + 1];
-			step_chg_config.fcc_cfg[i].value = cfg[i*3 + 2];
+			the_chip->step_chg_config->fcc_cfg[i].low_threshold = cfg[i*3];
+			the_chip->step_chg_config->fcc_cfg[i].high_threshold = cfg[i*3 + 1];
+			the_chip->step_chg_config->fcc_cfg[i].value = cfg[i*3 + 2];
 		}
 		break;
 	case JEITA_FCC_CFG:
 		for(i=0; i < cfg_len; i++)
 		{
-			jeita_fcc_config.fcc_cfg[i].low_threshold = cfg[i*3];
-			jeita_fcc_config.fcc_cfg[i].high_threshold = cfg[i*3 + 1];
-			jeita_fcc_config.fcc_cfg[i].value = cfg[i*3 + 2];
+			the_chip->jeita_fcc_config->fcc_cfg[i].low_threshold = cfg[i*3];
+			the_chip->jeita_fcc_config->fcc_cfg[i].high_threshold = cfg[i*3 + 1];
+			the_chip->jeita_fcc_config->fcc_cfg[i].value = cfg[i*3 + 2];
 		}
 		break;
 	case JEITA_FV_CFG:
 		for(i=0; i < cfg_len; i++)
 		{
-			jeita_fv_config.fv_cfg[i].low_threshold = cfg[i*3];
-			jeita_fv_config.fv_cfg[i].high_threshold = cfg[i*3 + 1];
-			jeita_fv_config.fv_cfg[i].value = cfg[i*3 + 2];
+			the_chip->jeita_fv_config->fv_cfg[i].low_threshold = cfg[i*3];
+			the_chip->jeita_fv_config->fv_cfg[i].high_threshold = cfg[i*3 + 1];
+			the_chip->jeita_fv_config->fv_cfg[i].value = cfg[i*3 + 2];
 		}
 		break;
 	default:

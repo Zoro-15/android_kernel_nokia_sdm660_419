@@ -491,9 +491,6 @@ struct fg_dev {
 	bool			qnovo_enable;
 	enum fg_version		version;
 	bool			suspended;
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
-	bool 			rsense_rw; // FIHTDC, IdaChiang, add for DRG external sense issue
-#endif
 	struct completion	soc_update;
 	struct completion	soc_ready;
 	struct delayed_work	profile_load_work;
