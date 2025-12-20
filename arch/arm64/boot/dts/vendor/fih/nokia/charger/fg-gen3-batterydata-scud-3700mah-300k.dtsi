@@ -9,6 +9,14 @@ qcom,3243289_fih_he347scud_3700mah_averaged_masterslave_dec21st2017 {
 	qcom,batt-id-kohm = <300>;
 	qcom,battery-beta = <3435>;
 	qcom,battery-type = "B2N_scud_3700mah_300k";
+	qcom,jeita-fcc-ranges = <0   150   600000
+				 151  450  2000000
+				 451 550  600000>;
+	qcom,jeita-fv-ranges = <0   150  4100000
+				151 450  4400000
+				451 550  4100000>;
+	qcom,step-chg-ranges = <3000000  4100000  2000000
+				4101000  4400000  1200000>;
 	qcom,checksum = <0x56BE>;
 	qcom,gui-version = "PM660GUI - 0.0.0.45";
 	qcom,fg-profile-data = [
