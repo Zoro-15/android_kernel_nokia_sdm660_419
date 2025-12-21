@@ -20,7 +20,6 @@
 #include <linux/err.h>
 #include <linux/cdev.h>
 #include <linux/types.h>
-#include <linux/wakelock.h>
 #include <linux/sched.h>
 #include <linux/mutex.h>
 #include <linux/pm.h>
@@ -62,8 +61,8 @@ struct elan_data  {
 	struct platform_device	*pdev;
 	struct input_dev		*input_dev;
 	spinlock_t				irq_lock;
-	struct wake_lock		wake_lock;
-    struct wake_lock	    hal_wake_lock;
+	struct wakeup_source	*wake_lock;
+    struct wakeup_source    *hal_wake_lock;
 	struct regulator        *pwr_reg;	//add by Win for regulator
 };
 
@@ -227,12 +226,12 @@ static long elan_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
             wake_lock_arg = (int __user)arg;
             if(!wake_lock_arg)
             {
-                wake_unlock(&fp->hal_wake_lock);
+                __pm_relax(fp->hal_wake_lock);
                 ELAN_DEBUG("[IOCTL] HAL WAKE UNLOCK = %d", wake_lock_arg);
             }
             else if(wake_lock_arg)
             {
-                wake_lock(&fp->hal_wake_lock);
+                __pm_stay_awake(fp->hal_wake_lock);
                 ELAN_DEBUG("[IOCTL] HAL WAKE LOCK = %d", wake_lock_arg);
             }
             else
@@ -326,7 +325,7 @@ static irqreturn_t elan_irq_handler(int irq, void *dev_id)
 	struct elan_data *fp = (struct elan_data *)dev_id;
 
 	ELAN_DEBUG("%s()\n", __func__);
-	wake_lock_timeout(&fp->wake_lock, msecs_to_jiffies(1000));
+	__pm_wakeup_event(fp->wake_lock, msecs_to_jiffies(1000));
     if(fp == NULL)
 		return IRQ_NONE;
     elan_work_flag = 1;
@@ -505,8 +504,8 @@ static int elan_probe(struct platform_device *pdev)
         printk("BBox::UEC;39::0\n");
     }
 
-    wake_lock_init(&fp->wake_lock, WAKE_LOCK_SUSPEND, "fp_wake_lock");
-    wake_lock_init(&fp->hal_wake_lock, WAKE_LOCK_SUSPEND, "hal_fp_wake_lock");
+    fp->wake_lock     = wakeup_source_register(NULL, "fp_wake_lock");
+    fp->hal_wake_lock = wakeup_source_register(NULL, "hal_fp_wake_lock");
 
 	ret = request_irq(fp->irq, elan_irq_handler,
 			IRQF_NO_SUSPEND | IRQF_TRIGGER_RISING | IRQF_ONESHOT, 

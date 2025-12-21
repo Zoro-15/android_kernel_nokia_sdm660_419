@@ -25,8 +25,6 @@
 
 #ifdef CONFIG_PM_WAKELOCKS
 #include <linux/pm_wakeup.h>
-#else
-#include <linux/wakelock.h>
 #endif
 
 #include <linux/miscdevice.h>
@@ -113,9 +111,7 @@ struct sf_ctl_device {
     int  (*spi_clk_on)(bool on);
     int  (*reset)     (void);
 #ifdef CONFIG_PM_WAKELOCKS
-    struct wakeup_source wakelock;
-#else
-    struct wake_lock wakelock;
+    struct wakeup_source *wakelock;
 #endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
     struct early_suspend early_suspend;
