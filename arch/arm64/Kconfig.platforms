@@ -465,4 +465,47 @@ config ARCH_ZYNQMP
 	help
 	  This enables support for Xilinx ZynqMP Family
 
+config FIH_SDM630_SDM660_PROJS
+	bool "FIH SDM660"
+	select ARCH_SDM630
+	select ARCH_SDM660
+	help
+	  Support for FIH SDM660 devices
+
+config FIH_CHARM
+        bool "FIH Charm project"
+        select FIH_SDM630_SDM660_PROJS
+        help
+          Support for FIH Charm devices
+
+config FIH_CRYSTAL
+        bool "FIH Crystal project"
+        select FIH_SDM630_SDM660_PROJS
+        help
+          Support for FIH Crystal devices
+
+config FIH_DRAGON
+        bool "FIH Dragon project"
+        select FIH_SDM630_SDM660_PROJS
+        help
+          Support for FIH Dragon devices
+
+config FIH_ONYX
+        bool "FIH Onyx project"
+        select FIH_SDM630_SDM660_PROJS
+        help
+          Support for FIH Onyx devices
+
+config FIH_PLATE2
+        bool "FIH Plate2 project"
+        select FIH_SDM630_SDM660_PROJS
+        help
+          Support for FIH Plate2 devices
+
+config FIH_TAISHAN
+        bool "FIH Taishan project"
+        select FIH_SDM630_SDM660_PROJS
+        help
+          Support for FIH Taishan devices
+
 endmenu
