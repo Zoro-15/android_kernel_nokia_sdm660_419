@@ -175,6 +175,7 @@
 
 &firmware {
 	android {
+		boot_devices = "soc/c0c4000.sdhci";
 		vbmeta {
 			compatible = "android,vbmeta";
 			parts = "vbmeta,boot,system,vendor,dtbo";
@@ -182,6 +183,7 @@
 		fstab {
 			vendor {
 				fsmgr_flags = "wait,slotselect,avb";
+				status = "disabled";
 			};
 		};
 	};
