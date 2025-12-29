@@ -754,6 +754,16 @@ static int pd_send_msg(struct usbpd *pd, u8 msg_type, const u32 *data,
 	if (pd->hard_reset_recvd)
 		return -EBUSY;
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+    //20170629 temp solution for C1N-1620 issue on 4601
+	/* if it's under hard reset, ignore any message deliver */
+	if (pd->hard_reset_recvd) {
+		usbpd_dbg(&pd->dev, "msg(%u) in hard reset\n", msg_type);
+		return 0;
+	}
+	//~20170629 temp solution for C1N-1620 issue on 4601
+#endif
+
 	if (sop == SOP_MSG)
 		hdr = PD_MSG_HDR(msg_type, pd->current_dr, pd->current_pr,
 				pd->tx_msgid[sop], num_data, pd->spec_rev);
@@ -2109,8 +2119,19 @@ static void handle_state_unknown(struct usbpd *pd, struct rx_msg *rx_msg)
 
 static void enter_state_error_recovery(struct usbpd *pd)
 {
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	union power_supply_propval val = {0};
+#endif
+
 	/* perform hard disconnect/reconnect */
 	pd->in_pr_swap = false;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		//20170623 QC patch for C1N-1620
+		val.intval = 0;
+		power_supply_set_property(pd->usb_psy,
+				POWER_SUPPLY_PROP_PR_SWAP, &val);
+		//~20170623 QC patch for C1N-1620
+#endif
 	pd->current_pr = PR_NONE;
 	set_power_role(pd, PR_NONE);
 	pd->typec_mode = POWER_SUPPLY_TYPEC_NONE;
@@ -3503,6 +3524,13 @@ static void handle_disconnect(struct usbpd *pd)
 	pd->peer_usb_comm = pd->peer_pr_swap = pd->peer_dr_swap = false;
 	memset(&pd->received_pdos, 0, sizeof(pd->received_pdos));
 	rx_msg_cleanup(pd);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		//20170623 QC patch for C1N-1620
+		power_supply_set_property(pd->usb_psy,
+				POWER_SUPPLY_PROP_PR_SWAP, &val);
+		//~20170623 QC patch for C1N-1620
+#endif
 
 	power_supply_set_property(pd->usb_psy,
 			POWER_SUPPLY_PROP_PD_IN_HARD_RESET, &val);
