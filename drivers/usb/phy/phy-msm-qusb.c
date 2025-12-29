@@ -982,6 +982,14 @@ static int qusb_phy_dpdm_regulator_enable(struct regulator_dev *rdev)
 	dev_dbg(qphy->phy.dev, "%s dpdm_enable:%d\n",
 				__func__, qphy->dpdm_enable);
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	// fix DDV-715 ycable not work if at first not charge by ligang at 20190523
+	if (qphy->phy.flags & PHY_HOST_MODE) {
+		dev_err(qphy->phy.dev, "%s: host mode active\n", __func__);
+		return -EINVAL;
+	}
+#endif
+
 	if (qphy->eud_enable_reg && readl_relaxed(qphy->eud_enable_reg)) {
 		dev_err(qphy->phy.dev, "eud is enabled\n");
 		return 0;
