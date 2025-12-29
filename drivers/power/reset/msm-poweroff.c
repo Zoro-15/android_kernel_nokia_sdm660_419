@@ -27,6 +27,10 @@
 #include <soc/qcom/watchdog.h>
 #include <soc/qcom/minidump.h>
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#include "../../platform/fih/fih_rere.h"  /* FIH, to support fih reboot command */
+#endif
+
 #define EMERGENCY_DLOAD_MAGIC1    0x322A4F99
 #define EMERGENCY_DLOAD_MAGIC2    0xC67E4350
 #define EMERGENCY_DLOAD_MAGIC3    0x77777777
@@ -115,9 +119,17 @@ static struct attribute_group reset_attr_group = {
 	.attrs = reset_attrs,
 };
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static int __init oem_dload_set(char *str);
+#endif
+
 static int dload_set(const char *val, const struct kernel_param *kp);
 module_param_call(download_mode, dload_set, param_get_int,
 			&download_mode, 0644);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+__setup("download_mode=", oem_dload_set);
+#endif
 
 static ssize_t attr_show(struct kobject *kobj, struct attribute *attr,
 			       char *buf);
@@ -234,6 +246,25 @@ static int dload_set(const char *val, const struct kernel_param *kp)
 
 	return 0;
 }
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static int __init oem_dload_set(char *str)
+{
+    int old_val = download_mode;
+    get_option(&str, &download_mode);
+
+
+    if(download_mode != 0 && download_mode != 1){
+        download_mode = old_val;
+        return -EINVAL;
+    }
+
+    pr_info("******%s check download_mode %d\n", __func__,download_mode);
+	set_dload_mode(download_mode);
+
+    return 1;
+}
+#endif
 
 static void free_dload_mode_mem(void)
 {
@@ -422,6 +453,21 @@ static size_t store_dload_mode(struct kobject *kobj, struct attribute *attr,
 }
 #endif /* CONFIG_QCOM_MINIDUMP */
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+/* FIH, to support fih apr */
+unsigned int restart_reason_rd(void)
+{
+	return readl(restart_reason);
+}
+
+void restart_reason_wt(unsigned int rere)
+{
+  qpnp_pon_set_restart_reason(rere);
+	__raw_writel(0, restart_reason);
+}
+/* FIH, to support fih apr */
+#endif
+
 static void scm_disable_sdi(void)
 {
 	int ret;
@@ -496,7 +542,11 @@ static void msm_restart_prepare(const char *cmd)
 		qpnp_pon_system_pwr_off(PON_POWER_OFF_HARD_RESET);
 
 	if (cmd != NULL) {
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		if (!strncmp(cmd, "bootloader", 10) || !strncmp(cmd, "download", 8)) {
+#else
 		if (!strncmp(cmd, "bootloader", 10)) {
+#endif
 			qpnp_pon_set_restart_reason(
 				PON_RESTART_REASON_BOOTLOADER);
 			__raw_writel(0x77665500, restart_reason);
@@ -581,7 +631,9 @@ static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
 	if (WDOG_BITE_ON_PANIC && in_panic)
 		msm_trigger_wdog_bite();
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	scm_disable_sdi();
+#endif
 	halt_spmi_pmic_arbiter();
 	deassert_ps_hold();
 
