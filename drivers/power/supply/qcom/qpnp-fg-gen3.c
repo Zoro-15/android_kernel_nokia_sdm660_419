@@ -861,6 +861,15 @@ static int fg_get_batt_profile(struct fg_dev *fg)
 		return -ENODATA;
 	}
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	// begin for the total capacity of batt
+	rc = of_property_read_u32(profile_node, "qcom,nom-batt-capacity-mah", &chip->battery_full_design);
+	if (rc < 0) {
+		pr_err("No profile data available\n");
+		return -ENODATA;
+	}
+#endif
+
 	if (len != PROFILE_LEN) {
 		pr_err("battery profile incorrect size: %d\n", len);
 		return -EINVAL;
@@ -1855,9 +1864,14 @@ static int fg_adjust_recharge_voltage(struct fg_dev *fg)
 	recharge_volt_mv = chip->dt.recharge_volt_thr_mv;
 
 	/* Lower the recharge voltage in soft JEITA */
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if (fg->health == POWER_SUPPLY_HEALTH_WARM)
+		recharge_volt_mv -= 300;
+#else
 	if (fg->health == POWER_SUPPLY_HEALTH_WARM ||
 			fg->health == POWER_SUPPLY_HEALTH_COOL)
 		recharge_volt_mv -= 200;
+#endif
 
 	rc = fg_set_recharge_voltage(fg, recharge_volt_mv);
 	if (rc < 0) {
@@ -3869,6 +3883,15 @@ unlock:
 
 	mutex_unlock(&chip->sram_rw_lock);
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	/*FIH_ZZDC_Code@2018/01/17 John::[PL2O-3267] a QC solution for devices can't be charged degin*/
+	msleep(100);
+	if (fg_get_batt_id(chip) < 0) {
+		pr_err("Error in getting battery id\n");
+	}
+	/*FIH_ZZDC_Code@2018/01/17 John::[PL2O-3267] a QC solution for devices can't be charged end*/
+#endif
+
 	if (!success)
 		return -EAGAIN;
 	else
@@ -4091,6 +4114,54 @@ static const struct power_supply_desc fg_psy_desc = {
 	.external_power_changed = fg_external_power_changed,
 	.property_is_writeable = fg_property_is_writeable,
 };
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+// FIHTDC, IdaChiang, add for DRG external sense issue {{
+static ssize_t rsense_sel_show(struct device *dev,
+			       struct device_attribute *attr, char *buf)
+{
+	struct fg_chip *chip = dev_get_drvdata(dev);
+	u8 sel = 0;
+	int rc;
+
+	rc = fg_read(chip, BATT_INFO_IBATT_SENSING_CFG(chip), &sel, 1);
+	if (rc < 0) {
+		pr_err("failed to read addr=0x%04x, rc=%d\n",
+			BATT_INFO_IBATT_SENSING_CFG(chip), rc);
+	}
+
+	pr_info("rsense_sel_show = %d\n", sel);
+	return sprintf(buf, "%d\n", sel);
+}
+
+static ssize_t rsense_sel_store(struct device *dev,
+		struct device_attribute *attr, const char
+		*buf, size_t size)
+{
+	struct fg_chip *chip = dev_get_drvdata(dev);
+	int intval =0;
+	int rc;
+
+	sscanf(buf, "%d", &intval);
+
+	if(intval !=0 && intval !=1 && intval !=2){
+		pr_info("%s:Invalid argument:%s\n", __func__, buf);
+		return -EINVAL;
+	}
+
+	rc = fg_masked_write(chip, BATT_INFO_IBATT_SENSING_CFG(chip),
+			SOURCE_SELECT_MASK, intval);
+	if (rc < 0) {
+		pr_err("Error in writing rsense_sel, rc=%d\n", rc);
+		return rc;
+	}
+
+	return size;
+}
+
+static DEVICE_ATTR(rsense_sel, 0644, rsense_sel_show, rsense_sel_store);
+// FIHTDC, IdaChiang, add for DRG external sense issue }}
+#endif
 
 /* INIT FUNCTIONS STAY HERE */
 
@@ -4914,7 +4985,11 @@ static void fg_create_debugfs(struct fg_dev *fg)
 #define DEFAULT_CHG_TERM_CURR_MA	100
 #define DEFAULT_CHG_TERM_BASE_CURR_MA	75
 #define DEFAULT_SYS_TERM_CURR_MA	-125
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#define DEFAULT_CUTOFF_CURR_MA		200
+#else
 #define DEFAULT_CUTOFF_CURR_MA		500
+#endif
 #define DEFAULT_DELTA_SOC_THR		1
 #define DEFAULT_RECHARGE_SOC_THR	95
 #define DEFAULT_BATT_TEMP_COLD		0
@@ -4949,6 +5024,10 @@ static int fg_parse_dt(struct fg_gen3_chip *chip)
 	u32 base, temp;
 	u8 subtype;
 	int rc;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	bool b_ex_rsense= false; // FIHTDC, IdaChiang, add for DRG external sense issue
+	int ex_rsense = 0; // FIHTDC, IdaChiang, add for DRG external sense issue
+#endif
 
 	if (!node)  {
 		dev_err(fg->dev, "device tree node missing\n");
@@ -5076,7 +5155,11 @@ static int fg_parse_dt(struct fg_gen3_chip *chip)
 	if (rc < 0)
 		chip->dt.sys_term_curr_ma = DEFAULT_SYS_TERM_CURR_MA;
 	else
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		chip->dt.sys_term_curr_ma = -temp;
+#else
 		chip->dt.sys_term_curr_ma = temp;
+#endif
 
 	rc = of_property_read_u32(node, "qcom,fg-chg-term-base-current", &temp);
 	if (rc < 0)
@@ -5116,6 +5199,29 @@ static int fg_parse_dt(struct fg_gen3_chip *chip)
 		chip->dt.rsense_sel = SRC_SEL_BATFET_SMB;
 	else
 		chip->dt.rsense_sel = (u8)temp & SOURCE_SELECT_MASK;
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+// FIHTDC, IdaChiang, add for DRG external sense issue {{
+	chip->rsense_rw = 0;
+	b_ex_rsense = of_property_read_bool(node, "fih,check-external-rsense");
+	if (b_ex_rsense == true)
+	{
+		pr_err("FIH check externel rsense\n");
+		chip->rsense_rw = 1;
+		rc = of_property_read_u32(node, "fih,use-external-resense", &ex_rsense);
+		if (rc < 0)
+			pr_err("can't read fih,use-external-resense\n");
+		else
+		{
+			if(ex_rsense == 1)
+			{
+				pr_err("FIH set to use externel rsense\n");
+				chip->dt.rsense_sel = 1;
+			}
+		}
+	}
+// FIHTDC, IdaChiang, add for DRG external sense issue }}
+#endif
 
 	chip->dt.jeita_thresholds[JEITA_COLD] = DEFAULT_BATT_TEMP_COLD;
 	chip->dt.jeita_thresholds[JEITA_COOL] = DEFAULT_BATT_TEMP_COOL;
@@ -5598,6 +5704,11 @@ static int fg_gen3_probe(struct platform_device *pdev)
 			pr_err("Error in configuring ESR filter rc:%d\n", rc);
 	}
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if(chip->rsense_rw == 1)
+		device_create_file(&pdev->dev, &dev_attr_rsense_sel); // FIHTDC, IdaChiang, add for DRG external sense issue
+#endif
+
 	device_init_wakeup(fg->dev, true);
 	schedule_delayed_work(&fg->profile_load_work, 0);
 
@@ -5663,6 +5774,11 @@ static const struct dev_pm_ops fg_gen3_pm_ops = {
 static int fg_gen3_remove(struct platform_device *pdev)
 {
 	struct fg_gen3_chip *chip = dev_get_drvdata(&pdev->dev);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if(chip->rsense_rw == 1)
+		device_remove_file(&pdev->dev, &dev_attr_rsense_sel); // FIHTDC, IdaChiang, add for DRG external sense issue
+#endif
 
 	fg_cleanup(chip);
 	return 0;
