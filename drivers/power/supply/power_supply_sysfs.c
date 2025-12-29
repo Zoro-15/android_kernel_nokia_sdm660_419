@@ -351,6 +351,14 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(usb_otg),
 	POWER_SUPPLY_ATTR(charge_enabled),
 	POWER_SUPPLY_ATTR(set_ship_mode),
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	POWER_SUPPLY_ATTR(fih_jeita_cool_more_levels),
+	POWER_SUPPLY_ATTR(fih_jeita_cool_more_levels_sts),
+	POWER_SUPPLY_ATTR(fih_jeita_cool_level_tmp_1),
+	POWER_SUPPLY_ATTR(fih_jeita_cool_level_tmp_2),
+	POWER_SUPPLY_ATTR(fih_jeita_cool_level_fcc_1),
+	POWER_SUPPLY_ATTR(fih_jeita_cool_level_fcc_2),
+#endif
 	POWER_SUPPLY_ATTR(real_type),
 	POWER_SUPPLY_ATTR(charge_now_raw),
 	POWER_SUPPLY_ATTR(charge_now_error),
@@ -430,6 +438,9 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(pd_voltage_min),
 	POWER_SUPPLY_ATTR(sdp_current_max),
 	POWER_SUPPLY_ATTR(fg_reset_clock),
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	POWER_SUPPLY_ATTR(wipwr_range_status),
+#endif
 	POWER_SUPPLY_ATTR(connector_type),
 	POWER_SUPPLY_ATTR(parallel_batfet_mode),
 	POWER_SUPPLY_ATTR(parallel_fcc_max),

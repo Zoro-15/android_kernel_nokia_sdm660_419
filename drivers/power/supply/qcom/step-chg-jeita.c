@@ -84,6 +84,68 @@ static struct step_chg_info *the_chip;
 #define GET_CONFIG_RETRY_COUNT		50
 #define WAIT_BATT_ID_READY_MS		200
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+int fih_set_step_chg_hysteresis(int hysteresis, int mode)
+{
+	if(hysteresis < 0)
+		return -1;
+
+	switch(mode) {
+	case STEP_CHG_CFG:
+		step_chg_config.hysteresis = hysteresis;
+		break;
+	case JEITA_FCC_CFG:
+		jeita_fcc_config.hysteresis = hysteresis;
+		break;
+	case JEITA_FV_CFG:
+		jeita_fv_config.hysteresis = hysteresis;
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+int fih_set_step_chg_cfg(int *cfg, int cfg_len, int mode)
+{
+	int i =0;
+
+	if(cfg_len > MAX_STEP_CHG_ENTRIES)
+		return -1;
+
+	switch(mode) {
+	case STEP_CHG_CFG:
+		for(i=0; i < cfg_len; i++)
+		{
+			step_chg_config.fcc_cfg[i].low_threshold = cfg[i*3];
+			step_chg_config.fcc_cfg[i].high_threshold = cfg[i*3 + 1];
+			step_chg_config.fcc_cfg[i].value = cfg[i*3 + 2];
+		}
+		break;
+	case JEITA_FCC_CFG:
+		for(i=0; i < cfg_len; i++)
+		{
+			jeita_fcc_config.fcc_cfg[i].low_threshold = cfg[i*3];
+			jeita_fcc_config.fcc_cfg[i].high_threshold = cfg[i*3 + 1];
+			jeita_fcc_config.fcc_cfg[i].value = cfg[i*3 + 2];
+		}
+		break;
+	case JEITA_FV_CFG:
+		for(i=0; i < cfg_len; i++)
+		{
+			jeita_fv_config.fv_cfg[i].low_threshold = cfg[i*3];
+			jeita_fv_config.fv_cfg[i].high_threshold = cfg[i*3 + 1];
+			jeita_fv_config.fv_cfg[i].value = cfg[i*3 + 2];
+		}
+		break;
+	default:
+		break;
+	}
+	return 0;
+
+}
+#endif
+
 static bool is_batt_available(struct step_chg_info *chip)
 {
 	if (!chip->batt_psy)

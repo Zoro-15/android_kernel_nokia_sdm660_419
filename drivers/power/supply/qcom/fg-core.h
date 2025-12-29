@@ -473,6 +473,9 @@ struct fg_dev {
 	int			last_msoc;
 	int			last_recharge_volt_mv;
 	int			delta_temp_irq_count;
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	int                     battery_full_design;
+#endif
 	enum esr_filter_status	esr_flt_sts;
 	bool			profile_available;
 	enum prof_load_status	profile_load_status;
@@ -488,6 +491,9 @@ struct fg_dev {
 	bool			qnovo_enable;
 	enum fg_version		version;
 	bool			suspended;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	bool 			rsense_rw; // FIHTDC, IdaChiang, add for DRG external sense issue
+#endif
 	struct completion	soc_update;
 	struct completion	soc_ready;
 	struct delayed_work	profile_load_work;
