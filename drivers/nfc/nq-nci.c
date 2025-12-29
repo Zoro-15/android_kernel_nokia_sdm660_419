@@ -44,6 +44,11 @@ static const struct of_device_id msm_match_table[] = {
 
 MODULE_DEVICE_TABLE(of, msm_match_table);
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#undef NFC_KERNEL_BU
+#define PN547_WAKE_LOCK_TIMEOUT	(HZ)
+#endif
+
 struct nqx_dev {
 	wait_queue_head_t	read_wq;
 	wait_queue_head_t	cold_reset_read_wq;
@@ -87,8 +92,13 @@ struct nqx_dev {
 	u8 *kbuf;
 	struct nqx_platform_data *pdata;
 	struct regulator *reg;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	struct wakeup_source	*pn547_wake_lock;
+	bool			suspended;
+#endif
 };
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 static int nfcc_reboot(struct notifier_block *notifier, unsigned long val,
 			void *v);
 /*clock enable function*/
@@ -103,6 +113,7 @@ static struct notifier_block nfcc_notifier = {
 	.next			= NULL,
 	.priority		= 0
 };
+#endif
 
 unsigned int	disable_ctrl;
 
@@ -110,6 +121,31 @@ static void nqx_init_stat(struct nqx_dev *nqx_dev)
 {
 	nqx_dev->count_irq = 0;
 }
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static ssize_t pn547_irq(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct nqx_dev *nqx_dev = i2c_get_clientdata(client);
+	int irq_status = 0;
+
+	irq_status = gpio_get_value(nqx_dev->irq_gpio);
+	printk("%s : irq_gpio = %d\n", __func__, irq_status);
+	sprintf(buf, "%d\n", irq_status);
+
+	return strlen(buf);
+}
+
+static DEVICE_ATTR(nfc_irq, 0644, pn547_irq, NULL);
+static struct attribute *pn547_attributes[] = {
+        &dev_attr_nfc_irq.attr,
+        NULL
+};
+
+static struct attribute_group pn547_attribute_group = {
+	.attrs = pn547_attributes
+};
+#endif
 
 static void nqx_disable_irq(struct nqx_dev *nqx_dev)
 {
@@ -157,8 +193,62 @@ static irqreturn_t nqx_dev_irq_handler(int irq, void *dev_id)
 	spin_unlock_irqrestore(&nqx_dev->irq_enabled_lock, flags);
 	wake_up(&nqx_dev->read_wq);
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if (nqx_dev->suspended) {
+#ifdef CONFIG_FIH_DEBUG
+		pr_err("%s, suspended, .\n", __func__);
+#endif
+		__pm_wakeup_event(nqx_dev->pn547_wake_lock, PN547_WAKE_LOCK_TIMEOUT);
+	}
+#endif
+
 	return IRQ_HANDLED;
 }
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static int nqx_dev_suspend(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct nqx_dev *nqx_dev = i2c_get_clientdata(client);
+
+	if (gpio_get_value(nqx_dev->irq_gpio)) {
+		pr_info("%s : IRQ is high, abort suspend. \n", __func__);
+		return -EBUSY;
+	}
+
+	mutex_lock(&nqx_dev->read_mutex);
+	if (gpio_get_value(nqx_dev->en_gpio)) {
+#ifdef CONFIG_FIH_DEBUG
+		pr_err("%s : VEN is on, enable wake up interrupt. \n", __func__);
+#endif
+		irq_set_irq_wake(client->irq, 1);
+		nqx_dev->suspended = true;
+	}
+	mutex_unlock(&nqx_dev->read_mutex);
+
+	return 0;
+}
+
+static int nqx_dev_resume(struct device *dev)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct nqx_dev *nqx_dev = i2c_get_clientdata(client);
+
+	mutex_lock(&nqx_dev->read_mutex);
+    if (gpio_get_value(nqx_dev->en_gpio)) {
+#ifdef CONFIG_FIH_DEBUG
+		pr_debug("%s : VEN is on, disable wake up interrupt. \n", __func__);
+#endif
+        irq_set_irq_wake(client->irq, 0);
+		nqx_dev->suspended = false;
+	}
+	mutex_unlock(&nqx_dev->read_mutex);
+
+	return 0;
+}
+
+static SIMPLE_DEV_PM_OPS(nqnci_dev_pm_ops, nqx_dev_suspend, nqx_dev_resume);
+#endif
 
 static int is_data_available_for_read(struct nqx_dev *nqx_dev)
 {
@@ -170,6 +260,7 @@ static int is_data_available_for_read(struct nqx_dev *nqx_dev)
 	return ret;
 }
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 static int send_cold_reset_cmd(struct nqx_dev *nqx_dev)
 {
 	int ret;
@@ -199,6 +290,7 @@ static int send_cold_reset_cmd(struct nqx_dev *nqx_dev)
 	kfree(cold_reset_cmd);
 	return ret;
 }
+#endif
 
 static void read_cold_reset_rsp(struct nqx_dev *nqx_dev, bool isNfcEnabled,
 				char *header)
@@ -253,6 +345,9 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 	unsigned char *tmp = NULL;
 	int ret;
 	int irq_gpio_val = 0;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	int retry;
+#endif
 
 	if (!nqx_dev) {
 		ret = -ENODEV;
@@ -277,6 +372,10 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 		}
 		while (1) {
 			ret = 0;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+            retry = 5;
+irq_read_retry:
+#endif
 			if (!nqx_dev->irq_enabled) {
 				nqx_dev->irq_enabled = true;
 				enable_irq(nqx_dev->client->irq);
@@ -285,9 +384,27 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 				ret = wait_event_interruptible(nqx_dev->read_wq,
 					!nqx_dev->irq_enabled);
 			}
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+            nqx_disable_irq(nqx_dev);
+			if (ret) {
+				if(retry > 0) {
+					retry--;
+#ifdef CONFIG_FIH_DEBUG
+					dev_err(&nqx_dev->client->dev,"%s: irq wait_event_interruptible ret=%d retry.\n", __func__, ret);
+#endif
+					goto irq_read_retry;
+				} else {
+#ifdef CONFIG_FIH_DEBUG
+					dev_err(&nqx_dev->client->dev,"%s: irq wait_event_interruptible ret=%d fail!\n", __func__, ret);
+#endif
+					goto err;
+				}
+			}
+#else
 			if (ret)
 				goto err;
 			nqx_disable_irq(nqx_dev);
+#endif
 
 			if (gpio_get_value(nqx_dev->irq_gpio))
 				break;
@@ -348,6 +465,13 @@ static ssize_t nfc_read(struct file *filp, char __user *buf,
 		goto err;
 	}
 	mutex_unlock(&nqx_dev->read_mutex);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	/* pn547 seems to be slow in handling I2C read requests
+	 * so add 1ms delay after recv operation */
+	udelay(1000);
+#endif
+
 	return ret;
 
 err:
@@ -411,6 +535,7 @@ out:
 	return ret;
 }
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 /**
  * nqx_standby_write()
  * @buf:       pointer to data buffer
@@ -439,7 +564,6 @@ static int nqx_standby_write(struct nqx_dev *nqx_dev,
 	}
 	return ret;
 }
-
 
 /*
  * Power management of the SN100 eSE
@@ -522,6 +646,7 @@ static int sn100_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 	}
 	return r;
 }
+#endif
 
 /*
  * Power management of the eSE
@@ -532,6 +657,7 @@ static int sn100_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 static int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 {
 	int r = -1;
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	const unsigned char svdd_off_cmd_warn[] =  {0x2F, 0x31, 0x01, 0x01};
 	const unsigned char svdd_off_cmd_done[] =  {0x2F, 0x31, 0x01, 0x00};
 
@@ -540,12 +666,40 @@ static int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 			"%s: ese_gpio is not valid\n", __func__);
 		return -EINVAL;
 	}
+#endif
 
+	/* FIH Change.
+	 * Let's store the NFC_EN pin state
+	 */
 	if (arg == 0) {
 		/*
 		 * We want to power on the eSE and to do so we need the
 		 * eSE_pwr_req pin and the NFC_EN pin to be high
 		 */
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		nqx_dev->nfc_ven_enabled = gpio_get_value(nqx_dev->en_gpio);
+		if (!nqx_dev->nfc_ven_enabled) {
+			gpio_set_value(nqx_dev->en_gpio, 1);
+			/* hardware dependent delay */
+			usleep_range(1000, 1100);
+		}
+		if (gpio_is_valid(nqx_dev->ese_gpio)) {
+			if (gpio_get_value(nqx_dev->ese_gpio)) {
+#ifdef CONFIG_FIH_DEBUG
+				dev_err(&nqx_dev->client->dev, "ese_gpio is already high\n");
+#endif
+				r = 0;
+			} else {
+				gpio_set_value(nqx_dev->ese_gpio, 1);
+				if (gpio_get_value(nqx_dev->ese_gpio)) {
+#ifdef CONFIG_FIH_DEBUG
+					dev_err(&nqx_dev->client->dev, "ese_gpio is enabled\n");
+#endif
+					r = 0;
+				}
+			}
+		}
+#else
 		if (gpio_get_value(nqx_dev->ese_gpio)) {
 			dev_dbg(&nqx_dev->client->dev, "ese_gpio is already high\n");
 			r = 0;
@@ -568,7 +722,27 @@ static int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 				r = 0;
 			}
 		}
+#endif
 	} else if (arg == 1) {
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		if (gpio_is_valid(nqx_dev->ese_gpio)) {
+			gpio_set_value(nqx_dev->ese_gpio, 0);
+			if (!gpio_get_value(nqx_dev->ese_gpio)) {
+#ifdef CONFIG_FIH_DEBUG
+				dev_err(&nqx_dev->client->dev, "ese_gpio is disabled\n");
+#endif
+				r = 0;
+			}
+		}
+		if (!nqx_dev->nfc_ven_enabled) {
+			/* hardware dependent delay */
+			usleep_range(1000, 1100);
+#ifdef CONFIG_FIH_DEBUG
+			dev_err(&nqx_dev->client->dev, "disabling en_gpio\n");
+#endif
+			gpio_set_value(nqx_dev->en_gpio, 0);
+		}
+#else
 		if (nqx_dev->nfc_ven_enabled &&
 			((nqx_dev->nqx_info.info.chip_type == NFCC_NQ_220) ||
 			(nqx_dev->nqx_info.info.chip_type == NFCC_PN66T))) {
@@ -622,6 +796,7 @@ static int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 			dev_dbg(&nqx_dev->client->dev, "ese_gpio is disabled\n");
 			r = 0;
 		}
+#endif
 
 		if (!nqx_dev->nfc_ven_enabled) {
 			/* hardware dependent delay */
@@ -630,11 +805,21 @@ static int nqx_ese_pwr(struct nqx_dev *nqx_dev, unsigned long arg)
 			gpio_set_value(nqx_dev->en_gpio, 0);
 		}
 	} else if (arg == 3) {
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		if (!nqx_dev->nfc_ven_enabled)
+			r = 0;
+		else {
+			if (gpio_is_valid(nqx_dev->ese_gpio))
+				r = gpio_get_value(nqx_dev->ese_gpio);
+		}
+#else
 		r = gpio_get_value(nqx_dev->ese_gpio);
+#endif
 	}
 	return r;
 }
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 /**
  * nfc_ldo_vote()
  * @nqx_dev: NFC device containing regulator handle
@@ -751,6 +936,7 @@ static int nfc_ldo_unvote(struct nqx_dev *nqx_dev)
 		dev_err(dev, "%s:set load failed\n", __func__);
 	return ret;
 }
+#endif
 
 static int nfc_open(struct inode *inode, struct file *filp)
 {
@@ -806,6 +992,56 @@ static int nfc_close(struct inode *inode, struct file *filp)
 	return 0;
 }
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
+{
+	int r = 0;
+	struct nqx_dev *nqx_dev = filp->private_data;
+
+	if (arg == 2) {
+		/* power on with firmware download (requires hw reset)
+		 */
+		dev_err(&nqx_dev->client->dev, "%s power on with firmware\n", __func__);
+
+        //Enable IRQ while upgrade FW.
+		//To avoid recovery fail and then nfc always in download mode.
+		if (!nqx_dev->irq_enabled) {
+			nqx_dev->irq_enabled = true;
+			enable_irq(nqx_dev->client->irq);
+			dev_err(&nqx_dev->client->dev, "%s enable NFC irq while entering NXP recovery\n", __func__);
+		}
+
+		gpio_set_value(nqx_dev->en_gpio, 1);
+		msleep(20);
+		if (nqx_dev->firm_gpio)
+			gpio_set_value(nqx_dev->firm_gpio, 1);
+		msleep(20);
+		gpio_set_value(nqx_dev->en_gpio, 0);
+		msleep(100);
+		gpio_set_value(nqx_dev->en_gpio, 1);
+		msleep(20);
+	} else if (arg == 1) {
+		/* power on */
+		//dev_err(&nqx_dev->client->dev, "%s power on\n", __func__);
+		if (nqx_dev->firm_gpio)
+			gpio_set_value(nqx_dev->firm_gpio, 0);
+		gpio_set_value(nqx_dev->en_gpio, 1);
+		msleep(100);
+	} else  if (arg == 0) {
+		/* power off */
+		//dev_err(&nqx_dev->client->dev, "%s power off\n", __func__);
+		if (nqx_dev->firm_gpio)
+			gpio_set_value(nqx_dev->firm_gpio, 0);
+		gpio_set_value(nqx_dev->en_gpio, 0);
+		msleep(100);
+	} else {
+		dev_err(&nqx_dev->client->dev, "%s bad arg %lu\n", __func__, arg);
+		return -EINVAL;
+	}
+
+	return r;
+}
+#else
 /*
  * nfc_ioctl_power_states() - power control
  * @filp:	pointer to the file descriptor
@@ -852,11 +1088,13 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 			gpio_set_value(nqx_dev->en_gpio, 0);
 			usleep_range(10000, 10100);
 		}
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		if (nqx_dev->pdata->clk_pin_voting) {
 			r = nqx_clock_deselect(nqx_dev);
 			if (r < 0)
 				dev_err(&nqx_dev->client->dev, "unable to disable clock\n");
 		}
+#endif
 		nqx_dev->nfc_ven_enabled = false;
 	} else if (arg == NFC_POWER_ON) {
 		nqx_enable_irq(nqx_dev);
@@ -869,11 +1107,13 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 		}
 		gpio_set_value(nqx_dev->en_gpio, 1);
 		usleep_range(10000, 10100);
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		if (nqx_dev->pdata->clk_pin_voting) {
 			r = nqx_clock_select(nqx_dev);
 			if (r < 0)
 				dev_err(&nqx_dev->client->dev, "unable to enable clock\n");
 		}
+#endif
 		nqx_dev->nfc_ven_enabled = true;
 	} else if (arg == NFC_FW_DWL_VEN_TOGGLE) {
 		/*
@@ -938,6 +1178,7 @@ int nfc_ioctl_power_states(struct file *filp, unsigned long arg)
 
 	return r;
 }
+#endif
 
 #ifdef CONFIG_COMPAT
 static long nfc_compat_ioctl(struct file *pfile, unsigned int cmd,
@@ -1017,17 +1258,21 @@ static long nfc_ioctl(struct file *pfile, unsigned int cmd,
 		r = nfc_ioctl_power_states(pfile, arg);
 		break;
 	case ESE_SET_PWR:
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		if ((nqx_dev->nqx_info.info.chip_type == NFCC_SN100_A) ||
 			(nqx_dev->nqx_info.info.chip_type == NFCC_SN100_B))
 			r = sn100_ese_pwr(nqx_dev, arg);
 		else
+#endif
 			r = nqx_ese_pwr(nqx_dev, arg);
 		break;
 	case ESE_GET_PWR:
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		if ((nqx_dev->nqx_info.info.chip_type == NFCC_SN100_A) ||
 			(nqx_dev->nqx_info.info.chip_type == NFCC_SN100_B))
 			r = sn100_ese_pwr(nqx_dev, 3);
 		else
+#endif
 			r = nqx_ese_pwr(nqx_dev, 3);
 		break;
 	case SET_RX_BLOCK:
@@ -1107,6 +1352,7 @@ static int get_nfcc_hw_info(struct i2c_client *client,
 		goto err_nfcc_hw_info;
 	}
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	if (nci_reset_rsp_payload_len == NCI_1_0_RESET_RSP_PAYLOAD_LEN) {
 		/*
 		 * Chipset is NQ330 or older.
@@ -1139,7 +1385,9 @@ static int get_nfcc_hw_info(struct i2c_client *client,
 			goto err_nfcc_hw_info;
 		}
 		nfcc_hw_info = nci_init_rsp;
-	} else {
+	} else
+#endif
+	{
 		/*
 		 * Chipset is NQ4xx or later.
 		 * Retrieve NTF data from wait queue.
@@ -1383,6 +1631,7 @@ done:
 	return ret;
 }
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 /*
  * Routine to enable clock.
  * this routine can be extended to select from multiple
@@ -1486,6 +1735,7 @@ static int nfc_parse_dt(struct device *dev, struct nqx_platform_data *pdata)
 	// return success as above properties are optional
 	return 0;
 }
+#endif
 
 static inline int gpio_input_init(const struct device * const dev,
 			const int gpio, const char * const gpio_name)
@@ -1520,9 +1770,11 @@ static int nqx_probe(struct i2c_client *client,
 			r = -ENOMEM;
 			goto err_platform_data;
 		}
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		r = nfc_parse_dt(&client->dev, platform_data);
 		if (r)
 			goto err_free_data;
+#endif
 	} else
 		platform_data = client->dev.platform_data;
 
@@ -1535,6 +1787,17 @@ static int nqx_probe(struct i2c_client *client,
 		r = -ENODEV;
 		goto err_platform_data;
 	}
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if( client->dev.of_node ){
+		platform_data->irq_gpio = of_get_named_gpio_flags(client->dev.of_node, "qcom,nq-irq", 0, NULL);
+		platform_data->en_gpio = of_get_named_gpio_flags(client->dev.of_node, "qcom,nq-ven", 0, NULL);
+		platform_data->firm_gpio = of_get_named_gpio_flags(client->dev.of_node, "qcom,nq-firm", 0, NULL);
+	}
+	dev_err(&client->dev, "%s irq_gpio=%d, ven_gpio=%d, firm_gpio=%d\n", __func__,
+		platform_data->irq_gpio, platform_data->en_gpio, platform_data->firm_gpio);
+#endif
+
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "%s: need I2C_FUNC_I2C\n", __func__);
 		r = -ENODEV;
@@ -1624,6 +1887,7 @@ static int nqx_probe(struct i2c_client *client,
 			"%s: firm gpio not provided\n", __func__);
 		goto err_irq_gpio;
 	}
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	if (gpio_is_valid(platform_data->ese_gpio)) {
 		r = gpio_request(platform_data->ese_gpio,
 				"nfc-ese_pwr");
@@ -1676,12 +1940,29 @@ static int nqx_probe(struct i2c_client *client,
 			"%s: clkreq gpio not provided\n", __func__);
 		goto err_ese_gpio;
 	}
+#endif
 
 	nqx_dev->en_gpio = platform_data->en_gpio;
 	nqx_dev->irq_gpio = platform_data->irq_gpio;
 	nqx_dev->firm_gpio  = platform_data->firm_gpio;
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	nqx_dev->clkreq_gpio = platform_data->clkreq_gpio;
+#endif
 	nqx_dev->pdata = platform_data;
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	r = sysfs_create_group(&client->dev.kobj, &pn547_attribute_group);
+	if (r) {
+		pr_err("%s : sysfs registration failed, error %d\n", __func__, r);
+		goto err_create_link;
+	}
+
+	r = sysfs_create_link(client->dev.kobj.parent->parent->parent->parent, &client->dev.kobj, "pn547_attr");
+	if (r) {
+		pr_err("%s : sysfs create link failed, error %d\n", __func__, r);
+		goto err_create_link;
+	}
+#endif
 
 	/* init mutex and queues */
 	init_waitqueue_head(&nqx_dev->read_wq);
@@ -1727,13 +2008,18 @@ static int nqx_probe(struct i2c_client *client,
 		dev_err(&client->dev, "%s: request_irq failed\n", __func__);
 		goto err_request_irq_failed;
 	}
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	nqx_dev->pn547_wake_lock = wakeup_source_register(nqx_dev->nqx_device, "nxp_pn547");
+#endif
 	nqx_disable_irq(nqx_dev);
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	r = nfc_ldo_config(client, nqx_dev);
 	if (r) {
 		dev_err(&client->dev, "%s: LDO config failed\n", __func__);
 		goto err_ldo_config_failed;
 	}
+#endif
 
 	/*
 	 * To be efficient we need to test whether nfcc hardware is physically
@@ -1744,10 +2030,18 @@ static int nqx_probe(struct i2c_client *client,
 	if (r) {
 		/* make sure NFCC is not enabled */
 		gpio_set_value(platform_data->en_gpio, 0);
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		dev_err(&client->dev,"%s: nfcc_hw_check fail\n", __func__);
+#endif
 		/* We don't think there is hardware switch NFC OFF */
+		//FIH: Avoid probe fail while in fw download mode begin
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		goto err_request_hw_check_failed;
+#endif
 	}
 
+//Avoid probe fail while in fw download mode end
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	/* Register reboot notifier here */
 	r = register_reboot_notifier(&nfcc_notifier);
 	if (r) {
@@ -1760,6 +2054,7 @@ static int nqx_probe(struct i2c_client *client,
 		 */
 		goto err_request_hw_check_failed;
 	}
+#endif
 
 #ifdef NFC_KERNEL_BU
 	r = nqx_clock_select(nqx_dev);
@@ -1787,6 +2082,7 @@ static int nqx_probe(struct i2c_client *client,
 err_clock_en_failed:
 	unregister_reboot_notifier(&nfcc_notifier);
 #endif
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 err_request_hw_check_failed:
 	if (nqx_dev->reg) {
 		nfc_ldo_unvote(nqx_dev);
@@ -1794,19 +2090,26 @@ err_request_hw_check_failed:
 	}
 err_ldo_config_failed:
 	free_irq(client->irq, nqx_dev);
+#endif
 err_request_irq_failed:
 	device_destroy(nqx_dev->nqx_class, nqx_dev->devno);
 err_device_create:
 	cdev_del(&nqx_dev->c_dev);
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+err_create_link:
+	sysfs_remove_group(&client->dev.kobj, &pn547_attribute_group);
+#endif
 err_cdev_add:
 	class_destroy(nqx_dev->nqx_class);
 err_class_create:
 	unregister_chrdev_region(nqx_dev->devno, DEV_COUNT);
 err_char_dev_register:
 	mutex_destroy(&nqx_dev->read_mutex);
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 err_clkreq_gpio:
 	gpio_free(platform_data->clkreq_gpio);
 err_ese_gpio:
+#endif
 	/* optional gpio, not sure was configured in probe */
 	if (gpio_is_valid(platform_data->ese_gpio))
 		gpio_free(platform_data->ese_gpio);
@@ -1843,6 +2146,7 @@ static int nqx_remove(struct i2c_client *client)
 		goto err;
 	}
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	gpio_set_value(nqx_dev->en_gpio, 0);
 	// HW dependent delay before LDO goes into LPM mode
 	usleep_range(10000, 10100);
@@ -1850,7 +2154,9 @@ static int nqx_remove(struct i2c_client *client)
 		ret = nfc_ldo_unvote(nqx_dev);
 		regulator_put(nqx_dev->reg);
 	}
+
 	unregister_reboot_notifier(&nfcc_notifier);
+#endif
 	free_irq(client->irq, nqx_dev);
 	cdev_del(&nqx_dev->c_dev);
 	device_destroy(nqx_dev->nqx_class, nqx_dev->devno);
@@ -1869,11 +2175,16 @@ static int nqx_remove(struct i2c_client *client)
 	if (client->dev.of_node)
 		devm_kfree(&client->dev, nqx_dev->pdata);
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	wakeup_source_unregister(nqx_dev->pn547_wake_lock);
+#endif
+
 	kfree(nqx_dev);
 err:
 	return ret;
 }
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 static int nqx_suspend(struct device *device)
 {
 	struct i2c_client *client = to_i2c_client(device);
@@ -1897,15 +2208,18 @@ static int nqx_resume(struct device *device)
 	}
 	return 0;
 }
+#endif
 
 static const struct i2c_device_id nqx_id[] = {
 	{"nqx-i2c", 0},
 	{}
 };
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 static const struct dev_pm_ops nfc_pm_ops = {
 	SET_SYSTEM_SLEEP_PM_OPS(nqx_suspend, nqx_resume)
 };
+#endif
 
 static struct i2c_driver nqx = {
 	.id_table = nqx_id,
@@ -1915,16 +2229,22 @@ static struct i2c_driver nqx = {
 		.name = "nq-nci",
 		.of_match_table = msm_match_table,
 		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 		.pm = &nfc_pm_ops,
+#else
+		.pm = &nqnci_dev_pm_ops
+#endif
 	},
 };
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 static int nfcc_reboot(struct notifier_block *notifier, unsigned long val,
 			  void *v)
 {
 	gpio_set_value(disable_ctrl, 1);
 	return NOTIFY_OK;
 }
+#endif
 
 /*
  * module load/unload record keeping
@@ -1937,7 +2257,9 @@ module_init(nqx_dev_init);
 
 static void __exit nqx_dev_exit(void)
 {
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	unregister_reboot_notifier(&nfcc_notifier);
+#endif
 	i2c_del_driver(&nqx);
 }
 module_exit(nqx_dev_exit);
