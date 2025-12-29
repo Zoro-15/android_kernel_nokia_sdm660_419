@@ -40,6 +40,13 @@
 #define MAX_SSR_REASON_LEN	256U
 #define STOP_ACK_TIMEOUT_MS	1000
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS) && defined(CONFIG_FIH_MFR)
+/* FIH, to support fih apr { */
+//VNA-3504, add modem failure reason
+char fih_failure_reason[MAX_SSR_REASON_LEN];
+/* FIH, to support fih apr } */
+#endif
+
 #define subsys_to_drv(d) container_of(d, struct modem_data, subsys_desc)
 
 static void log_modem_sfr(struct modem_data *drv)
@@ -63,6 +70,14 @@ static void log_modem_sfr(struct modem_data *drv)
 
 	strlcpy(reason, smem_reason, min(size, (size_t)MAX_SSR_REASON_LEN));
 	pr_err("modem subsystem failure reason: %s.\n", reason);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS) && defined(CONFIG_FIH_MFR)
+	/* FIH, to support fih apr { */
+	//VNA-3504, add modem failure reason
+	strlcpy(fih_failure_reason, smem_reason, min(size, (size_t)MAX_SSR_REASON_LEN));
+	//pr_err("fih get failure reason: %s.\n", fih_failure_reason);
+	/* FIH, to support fih apr } */
+#endif
 }
 
 static void restart_modem(struct modem_data *drv)
@@ -233,6 +248,10 @@ static int pil_subsys_init(struct modem_data *drv,
 {
 	int ret = -EINVAL;
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS) && defined(CONFIG_FIH_MFR)
+	// init the fih_failure_reason.
+	fih_failure_reason[0] = '\0';
+#endif
 	drv->subsys_desc.name = "modem";
 	drv->subsys_desc.dev = &pdev->dev;
 	drv->subsys_desc.owner = THIS_MODULE;
