@@ -284,6 +284,9 @@ static void free_fw_priv(struct fw_priv *fw_priv)
 static char fw_path_para[256];
 static const char * const fw_path[] = {
 	fw_path_para,
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	"/vendor/firmware",
+#endif
 	"/lib/firmware/updates/" UTS_RELEASE,
 	"/lib/firmware/updates",
 	"/lib/firmware/" UTS_RELEASE,
@@ -329,6 +332,45 @@ fw_get_filesystem_firmware(struct device *device, struct fw_priv *fw_priv)
 			rc = -ENAMETOOLONG;
 			break;
 		}
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		if (!strcmp(fw_priv->fw_name, "iris3.fw") && i == 1) {
+			snprintf(path, PATH_MAX, "%s/%s", "/persist", fw_priv->fw_name);
+			dev_err(device, "[Iris] Try to load: %s\n", path);
+		}
+		if (!strcmp(fw_priv->fw_name, "iris3.fw") && i == 2) {
+			snprintf(path, PATH_MAX, "%s/%s", "/data/vendor/misc", fw_priv->fw_name);
+			dev_err(device, "[Iris] Try to load: %s\n", path);
+		}
+#elif defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		if (!strcmp(fw_priv->fw_name, "iris3.fw") && i == 1) {
+			extern int iris3_CT_value;
+			if(iris3_CT_value != 7800){
+				i = 3;
+				continue;
+			}
+			snprintf(path, PATH_MAX, "%s/%s", "/mnt/pixelworks", fw_priv->fw_name);
+			dev_err(device, "[Iris] Try to load 1: %s\n", path);
+		}
+		if (!strcmp(fw_priv->fw_name, "HLT-iris3.fw") && i == 1) {
+			extern int iris3_CT_value;
+			if(iris3_CT_value != 7800){
+				i = 3;
+				continue;
+			}
+			snprintf(path, PATH_MAX, "%s/%s", "/mnt/pixelworks", "iris3.fw");
+			dev_err(device, "[Iris] Try to load 2: %s\n", path);
+		}
+		if (!strcmp(fw_priv->fw_name, "iris3_ct_value")) {
+			if(i <= 2){
+				snprintf(path, PATH_MAX, "%s/%s", "/mnt/pixelworks", fw_priv->fw_name);
+				dev_err(device, "[Iris] Try to load: %s\n", path);
+			}
+			else{
+				i = ARRAY_SIZE(fw_path);
+			}
+		}
+#endif
 
 		fw_priv->size = 0;
 		rc = kernel_read_file_from_path(path, &fw_priv->data, &size,
