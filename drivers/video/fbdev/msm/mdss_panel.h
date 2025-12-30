@@ -55,6 +55,26 @@ struct panel_id {
 /* HDR propeties count */
 #define DISPLAY_PRIMARIES_COUNT	8	/* WRGB x and y values*/
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+//SW4-HL-Display-ImplementPanelID-00+{_20151112
+enum {	//this id syncs with the item 'fih,panel-id' of each panel's dtsi
+	SIMULATION_PANEL = 0,
+	FIH_ILI7807E_1080P_VIDEO_PANEL = 1,
+	FIH_FT8716U_1080P_CTC_VIDEO_PANEL = 2,		//SW4-JasonSH-Display-BringUpFT8716U-00+_20170619
+	FIH_FT8716U_FHD_CTC_B2N_VIDEO_PANEL = 3,		/* B2N - gatycclu - Add B2N setting */
+	FIH_NT36672_FHD_CTC_B2N_VIDEO_PANEL = 4,		/* B2N - gatycclu - Add B2N 2nd source setting */
+	FIH_NT36672_H_GLASS_FHD_CTC_B2N_VIDEO_PANEL = 5,		/* B2N 2nd source H-GLASS setting */
+	FIH_R69338_1080P_VIDEO_PANEL_PL2 = 15,			//ZZDC sunqiupeng add for bringup PL2 2nd panel@20171226
+	FIH_CTC_OTM1911A_FHD_VIDEO_PANEL = 16,		//SW4-HL-Display-BringUpCTCOTM1911A-00+_20180116
+	FIH_AUO_OTM1911A_FHD_VIDEO_PANEL = 17,		//SW4-HL-Display-OTM1911A-AUO-BringUp-00+_20180221
+    	FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL = 19,	//SW4-HL-Display-CTL-GT915L-CTC_n_AUO-BringUp-00+_20180226
+    	FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL = 20,      //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+    	FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL = 21,       //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+    	FIH_FT8719_1080P_VIDEO_PANEL = 22,
+};
+//SW4-HL-Display-ImplementPanelID-00+}_20151112
+#endif
+
 static inline const char *mdss_panel2str(u32 panel)
 {
 	static const char * const names[] = {
@@ -785,6 +805,10 @@ struct mdss_panel_info {
 	u32 yres;
 	u32 physical_width;
 	u32 physical_height;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	u32 physical_width_full;	//SW4-HL-Display-CTS_Xdpi_Ydpi-00+_20151112
+	u32 physical_height_full;	//SW4-HL-Display-CTS_Xdpi_Ydpi-00+_20151112
+#endif
 	u32 bpp;
 	u32 type;
 	u32 wait_cycle;
@@ -885,6 +909,10 @@ struct mdss_panel_info {
 	char display_id[MDSS_DISPLAY_ID_MAX_LEN];
 	bool is_cec_supported;
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	u32 panel_hwid;
+#endif
+
 	/* refer sim_panel_modes enum for different modes */
 	u8 sim_panel_mode;
 
@@ -942,6 +970,10 @@ struct mdss_panel_info {
 
 	/* esc clk recommended for the panel */
 	u32 esc_clk_rate_hz;
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	int panel_id;	//SW4-HL-Display-ImplementPanelID-00+_20151112
+#endif
 };
 
 struct mdss_panel_timing {

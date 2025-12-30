@@ -101,6 +101,9 @@ enum dsi_panel_status_mode {
 	ESD_BTA,
 	ESD_REG,
 	ESD_REG_NT35596,
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	ESD_TP,
+#endif
 	ESD_TE,
 	ESD_MAX,
 };
@@ -383,6 +386,10 @@ struct dsi_err_container {
 	u32 err_cnt;
 	u32 err_time_delta;
 	u32 max_err_index;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	u32 dsi_ack_err_cnt;
+	u32 dsi_ack_err_status;
+#endif
 
 	u32 index;
 	s64 err_time[MAX_ERR_INDEX];
@@ -440,6 +447,9 @@ struct mdss_dsi_ctrl_pdata {
 	struct clk *pixel_clk_rcg;
 	struct clk *vco_dummy_clk;
 	struct clk *byte_intf_clk;
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	struct clk *BB_clk2;
+#endif
 	u8 ctrl_state;
 	int panel_mode;
 	int irq_cnt;
@@ -452,6 +462,16 @@ struct mdss_dsi_ctrl_pdata {
 	int avdd_en_gpio;
 	bool avdd_en_gpio_invert;
 	int lcd_mode_sel_gpio;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	int hdr_rst_gpio;					//SW4-HL-Display-CTL-GT915L-CTC_n_AUO-BringUp-00+_20180226
+	int hdr_wakeup_gpio;				//SW4-HL-Display-CTL-GT915L-CTC_n_AUO-BringUp-00+_20180226
+	int hdr_1p8_en_gpio;				//SW4-HL-Display-CTL-GT915L-CTC_n_AUO-BringUp-00+_20180226	
+	int tp_rst_gpio;					//SW4-HL-Display-BringUpILI7807E-00+_20170327
+	int iovdd_enable;					//SW4-JasonSH-Display-BringUpFT8716U-00+_20170619
+#endif
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	int px8418_reset_gpio;
+#endif
 	int bklt_ctrl;	/* backlight ctrl */
 	enum dsi_ctrl_op_mode bklt_dcs_op_mode; /* backlight dcs ctrl mode */
 	bool pwm_pmi;
@@ -497,6 +517,9 @@ struct mdss_dsi_ctrl_pdata {
 	struct dsi_panel_cmds lp_on_cmds;
 	struct dsi_panel_cmds lp_off_cmds;
 	struct dsi_panel_cmds status_cmds;
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	struct dsi_panel_cmds read_128bytes_cmds;
+#endif
 	u32 *status_valid_params;
 	u32 *status_cmds_rlen;
 	u32 *status_value;
@@ -507,6 +530,20 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct dsi_panel_cmds video2cmd;
 	struct dsi_panel_cmds cmd2video;
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	struct dsi_panel_cmds switch_cmdpage_cmds;	//SW4-HL-Display-ShowLCMAndBacklightStatus-00+_20160304
+
+	struct dsi_panel_cmds bist_mode_black_pattern_cmds;	//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-00+_20170614
+	struct dsi_panel_cmds bist_mode_off_cmds; 			//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-00+_20170614
+
+	//SW4-HL-Display-C1NO-3148-00+{_20180508
+	struct dsi_panel_cmds mipi_term_resistor_04h_cmds;
+	struct dsi_panel_cmds mipi_term_resistor_14h_cmds;
+	struct dsi_panel_cmds mipi_term_resistor_24h_cmds;
+	struct dsi_panel_cmds mipi_term_resistor_34h_cmds;
+	//SW4-HL-Display-C1NO-3148-00+}_20180508
+#endif
 
 	char pps_buf[DSC_PPS_LEN];	/* dsc pps */
 
@@ -588,6 +625,18 @@ struct mdss_dsi_ctrl_pdata {
 	bool update_phy_timing; /* flag to recalculate PHY timings */
 
 	bool phy_power_off;
+
+#if defined(CONFIG_PXLW_IRIS3)
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	int abyp_gpio;
+	int iris_rst_gpio;
+#endif // CONFIG_LONGCHEER_SDM660_PROJS
+	bool interleave_op_contention;
+	bool bta_error;
+#endif
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	bool esd_need_reset;
+#endif
 };
 
 struct dsi_status_data {
@@ -679,6 +728,9 @@ int mdss_dsi_cmdlist_commit(struct mdss_dsi_ctrl_pdata *ctrl, int from_mdp);
 void mdss_dsi_cmdlist_kickoff(int intf);
 int mdss_dsi_bta_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
 int mdss_dsi_reg_status_check(struct mdss_dsi_ctrl_pdata *ctrl);
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+int mdss_dsi_read_touch_status(struct mdss_dsi_ctrl_pdata *pdata);
+#endif
 bool __mdss_dsi_clk_enabled(struct mdss_dsi_ctrl_pdata *ctrl, u8 clk_type);
 void mdss_dsi_ctrl_setup(struct mdss_dsi_ctrl_pdata *ctrl);
 bool mdss_dsi_dln0_phy_err(struct mdss_dsi_ctrl_pdata *ctrl, bool print_en);

@@ -265,6 +265,9 @@ enum mdss_mdp_csc_type {
 	MDSS_MDP_CSC_RGB2YUV_2020FR,
 	MDSS_MDP_CSC_YUV2YUV,
 	MDSS_MDP_CSC_RGB2RGB,
+#if defined(CONFIG_PXLW_IRIS3)
+	MDSS_MDP_CSC_YCoCg,
+#endif
 	MDSS_MDP_MAX_CSC
 };
 
@@ -1832,6 +1835,9 @@ int mdss_mdp_pipe_sspp_setup(struct mdss_mdp_pipe *pipe, u32 *op);
 int mdss_mdp_pp_sspp_config(struct mdss_mdp_pipe *pipe);
 int mdss_mdp_copy_layer_pp_info(struct mdp_input_layer *layer);
 void mdss_mdp_free_layer_pp_info(struct mdp_input_layer *layer);
+#if defined(CONFIG_PXLW_IRIS3)
+void mdss_mdp_sspp_csc_reset(struct mdss_mdp_pipe *pipe);
+#endif
 
 int mdss_mdp_smp_setup(struct mdss_data_type *mdata, u32 cnt, u32 size);
 
@@ -1928,6 +1934,9 @@ void mdss_mdp_data_calc_offset(struct mdss_mdp_data *data, u16 x, u16 y,
 	struct mdss_mdp_plane_sizes *ps, struct mdss_mdp_format_params *fmt);
 void mdss_mdp_format_flag_removal(u32 *table, u32 num, u32 remove_bits);
 struct mdss_mdp_format_params *mdss_mdp_get_format_params(u32 format);
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+int mdss_mdp_get_ubwc_micro_dim(u32 format, u16 *w, u16 *h);
+#endif
 int mdss_mdp_validate_offset_for_ubwc_format(
 	struct mdss_mdp_format_params *fmt, u16 x, u16 y);
 void mdss_mdp_get_v_h_subsample_rate(u8 chroma_samp,

@@ -22,12 +22,71 @@
 #include "mdss_debug.h"
 #include "mdss_livedisplay.h"
 
+#if defined(CONFIG_PXLW_IRIS3)
+#include "mdss_dsi_iris3.h"
+#include "mdss_dsi_iris3_lightup.h"
+#include "mdss_dsi_iris3_lightup_ocp.h"
+#include "mdss_dsi_iris3_pq.h"
+#endif
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#include <linux/proc_fs.h>
+#include <linux/uaccess.h>
+#include <linux/lct_tp_fm_info.h>
+
+int panel_calibrate_state_get(void);
+int panel_calibrate_state_set(int state);
+static int calibrate_state = 0;
+u32 panel_hardware_id = 0;
+#endif
+
 #define DT_CMD_HDR 6
 #define DEFAULT_MDP_TRANSFER_TIME 14000
 
 #define VSYNC_DELAY msecs_to_jiffies(17)
+
+#if defined(CONFIG_TOUCHSCREEN_FTS) || \
+	defined(CONFIG_TOUCHSCREEN_FTS_LC) || \
+	defined(CONFIG_TOUCHSCREEN_HIMAX_COMMON)
+extern int lcd_need_reset;
+#endif
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+char g_lcd_id[128];
+#endif
+
 #ifndef CONFIG_BACKLIGHT_QCOM_SPMI_WLED
 DEFINE_LED_TRIGGER(bl_led_trigger);
+#endif
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#define PANEL_REG_ADDR_LEN 8					//SW4-HL-Display-DynamicReadWriteRegister-00+_20160729
+
+#if defined(CONFIG_TOUCHSCREEN_ILI210X)
+//SW4-HL-TP-EnableDisableIrqRightAfterOrBeforeLcmDisplayOnOrdisplayOff-00+{_20170515
+extern void fih_tp_lcm_resume(void);
+extern int fih_tp_lcm_resume_lpwg_off(void);		//SW4-HL-Touch-ImplementDoubleTap-00+_20170623
+extern void fih_tp_lcm_resume_sensing_start(void);	//SW4-HL-Touch-ImplementDoubleTap-00+_20170623
+extern void fih_tp_lcm_suspend(void);
+//SW4-HL-TP-EnableDisableIrqRightAfterOrBeforeLcmDisplayOnOrdisplayOff-00+}_20170515
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_GT9XX)
+extern void fih_goodix_ts_resume(void);
+extern void fih_goodix_ts_suspend(void);
+#endif
+
+#if defined(CONFIG_TOUCHSCREEN_NT36xxx_FIH)
+//SW4-HL-TP-B2N-NT36672-DoubleTap-00+{_20180302
+extern void fih_nvt_ts_resume(void);
+extern void fih_nvt_ts_suspend(void);
+extern int gdouble_tap_enable_nvt;
+//SW4-HL-TP-B2N-NT36672-DoubleTap-00+}_20180302
+#endif
+
+static int DispOff = 0;	//SW4-HL-Display-NT35597-Fix_JGR-5432-AvoidCabcOffCmdIsSentDuring0x28And0x11Cmd-00+_20160601
+
+static int BistMode = 0;	//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-01+_20170809
 #endif
 
 void mdss_dsi_panel_pwm_cfg(struct mdss_dsi_ctrl_pdata *ctrl)
@@ -95,6 +154,14 @@ static void mdss_dsi_panel_bklt_pwm(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 
 	pr_debug("%s: ndx=%d level=%d duty=%d\n", __func__,
 					ctrl->ndx, level, duty);
+
+#if defined(CONFIG_PXLW_IRIS3)
+	if (iris_is_valid_cfg()) {
+		/*continuous splash should not setting dbc use dma*/
+		if (IRIS_CONT_SPLASH_LK != iris_get_cont_splash_type())
+			iris_dbc_bl_user_set(level);
+	}
+#endif
 
 	if (ctrl->pwm_period >= USEC_PER_SEC) {
 
@@ -179,17 +246,28 @@ static void mdss_dsi_panel_apply_settings(struct mdss_dsi_ctrl_pdata *ctrl,
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
 
-
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+int mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
+			struct dsi_panel_cmds *pcmds, u32 flags)
+#else
 void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 			struct dsi_panel_cmds *pcmds, u32 flags)
+#endif
 {
 	struct dcs_cmd_req cmdreq;
 	struct mdss_panel_info *pinfo;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	int len = 1;	//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+#endif
 
 	pinfo = &(ctrl->panel_data.panel_info);
 	if (pinfo->dcs_cmd_by_left) {
 		if (ctrl->ndx != DSI_CTRL_LEFT)
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+			return len;	//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+#else
 			return;
+#endif
 	}
 
 	memset(&cmdreq, 0, sizeof(cmdreq));
@@ -206,10 +284,22 @@ void mdss_dsi_panel_cmds_send(struct mdss_dsi_ctrl_pdata *ctrl,
 	cmdreq.rlen = 0;
 	cmdreq.cb = NULL;
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+	len = mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+
+	return len;
+	//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+#else
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+#endif
 }
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static char led_pwm1[3] = {0x51, 0x0, 0x0};	/* DTYPE_DCS_WRITE1 */
+#else
 static char led_pwm1[2] = {0x51, 0x0};	/* DTYPE_DCS_WRITE1 */
+#endif
 static struct dsi_cmd_desc backlight_cmd = {
 	{DTYPE_DCS_WRITE1, 1, 0, 0, 1, sizeof(led_pwm1)},
 	led_pwm1
@@ -228,7 +318,23 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 
 	pr_debug("%s: level=%d\n", __func__, level);
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	switch (pinfo->panel_id)
+	{
+#if defined(CONFIG_FIH_ONYX)
+		case FIH_FT8716U_FHD_CTC_B2N_VIDEO_PANEL:
+			led_pwm1[1] = (unsigned char) ((level*1023/255) >> 2);
+			led_pwm1[2] = (unsigned char) ((level*1023/255) & 0x3);
+			break;
+#endif
+		default:
+			led_pwm1[1] = (unsigned char)level;
+			break;
+	}
+	pr_debug("\n\n%s: level led_pwm1[1]=0x%x, led_pwm1[2]=0x%x\n", __func__, led_pwm1[1], led_pwm1[2]);
+#else
 	led_pwm1[1] = (unsigned char)level;
+#endif
 
 	memset(&cmdreq, 0, sizeof(cmdreq));
 	cmdreq.cmds = &backlight_cmd;
@@ -242,12 +348,61 @@ static void mdss_dsi_panel_bklt_dcs(struct mdss_dsi_ctrl_pdata *ctrl, int level)
 	else
 		cmdreq.flags |= CMD_REQ_LP_MODE;
 
+#if defined(CONFIG_PXLW_IRIS3)
+	if (iris_is_valid_cfg())
+		iris_panel_cmd_passthrough(ctrl, &cmdreq);
+	else
+		mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+#else
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
+#endif
 }
 
 static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	int rc = 0;
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	//SW4-HL-LCM-CTL-OTM1911A-FixNotBeAbleToLightedUpInOS-00+{_20180315
+	switch (ctrl_pdata->panel_data.panel_info.panel_id)
+	{
+#if defined(CONFIG_FIH_CRYSTAL)
+		case FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL:
+		case FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL:      //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+		case FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL:       //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+			{
+				if (gpio_is_valid(ctrl_pdata->hdr_rst_gpio)) {
+					pr_debug("\n\n******************** [HL]%s, %d: gpio_request(ctrl_pdata->hdr_rst_gpio <-- START\n", __func__, __LINE__);
+					rc = gpio_request(ctrl_pdata->hdr_rst_gpio,
+									"hdr_rst");
+					if (rc) {
+						pr_err("request hdr_rst gpio failed, rc=%d\n",
+							       rc);
+						gpio_free(ctrl_pdata->hdr_rst_gpio);
+					}
+					pr_debug("\n\n******************** [HL]%s, %d: gpio_request(ctrl_pdata->hdr_rst_gpio <-- END\n", __func__, __LINE__);
+				}
+#if defined(CONFIG_PXLW_IRIS3)
+				// Todo: why we could control wakeup gpio without request wakeup gpio.
+				/* if (gpio_is_valid(ctrl_pdata->hdr_wakeup_gpio)) {
+                                    pr_err("[HL]%s, %d\n", __func__, __LINE__);
+                                    gpio_free(ctrl_pdata->hdr_wakeup_gpio);
+                                    pr_err("[HL]%s, %d\n", __func__, __LINE__);
+                                    pr_err("\n\n******************** [HL]%s, %d: gpio_request(ctrl_pdata->hdr_wakeup_gpio <-- START\n", __func__, __LINE__);
+                                    rc = gpio_request(ctrl_pdata->hdr_wakeup_gpio, "hdr_wakeup");
+                                    if (rc) {
+                                            pr_err("request hdr wakeup gpio failed,rc=%d\n", rc);
+                                            gpio_free(ctrl_pdata->hdr_wakeup_gpio);
+                                    }
+                                    pr_err("\n\n******************** [HL]%s, %d: gpio_request(ctrl_pdata->hdr_wakeup_gpio <-- END\n", __func__, __LINE__);
+                            }*/
+#endif
+			}
+			break;
+#endif
+	}
+	//SW4-HL-LCM-CTL-OTM1911A-FixNotBeAbleToLightedUpInOS-00+}_20180315
+#endif
 
 	if (gpio_is_valid(ctrl_pdata->disp_en_gpio)) {
 		rc = gpio_request(ctrl_pdata->disp_en_gpio,
@@ -258,12 +413,51 @@ static int mdss_dsi_request_gpios(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 			goto disp_en_gpio_err;
 		}
 	}
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+        rc = gpio_request(ctrl_pdata->px8418_reset_gpio,"px8418_reset");
+#endif
 	rc = gpio_request(ctrl_pdata->rst_gpio, "disp_rst_n");
 	if (rc) {
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		pr_err("request px8418_reset gpio failed, rc=%d\n",rc);
+		goto px8418_rst_gpio_err;
+#else
 		pr_err("request reset gpio failed, rc=%d\n",
 			rc);
-		goto rst_gpio_err;
+#endif
+#if defined(CONFIG_FIH_TAISHAN)
+		if (ctrl_pdata->panel_data.panel_info.panel_id != FIH_FT8719_1080P_VIDEO_PANEL) {
+			goto rst_gpio_err;
+		} else {
+			rc = 0;
+		}
+#endif
 	}
+
+	if (gpio_is_valid(ctrl_pdata->bklt_en_gpio)) {
+		rc = gpio_request(ctrl_pdata->bklt_en_gpio,
+						"bklt_enable");
+		if (rc) {
+			pr_err("request bklt gpio failed, rc=%d\n",
+				       rc);
+			goto rst_gpio_err;
+		}
+	}
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+        if(tp_gesture_wakeup() == 1)
+                pr_debug("request disp_en gpio failed, rc=%d\n",rc);
+        else{
+                rc = gpio_request(ctrl_pdata->rst_gpio, "disp_rst_n");
+        	if (rc) {
+        		pr_err("request reset gpio failed, rc=%d\n",
+        			rc);
+        		goto rst_gpio_err;
+        	}
+        }
+#endif
+
 	if (gpio_is_valid(ctrl_pdata->avdd_en_gpio)) {
 		rc = gpio_request(ctrl_pdata->avdd_en_gpio,
 						"avdd_enable");
@@ -292,6 +486,13 @@ avdd_en_gpio_err:
 rst_gpio_err:
 	if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
 		gpio_free(ctrl_pdata->disp_en_gpio);
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+        if (gpio_is_valid(ctrl_pdata->px8418_reset_gpio))
+		gpio_free(ctrl_pdata->px8418_reset_gpio);
+px8418_rst_gpio_err:
+	if (gpio_is_valid(ctrl_pdata->disp_en_gpio))
+		gpio_free(ctrl_pdata->disp_en_gpio);
+#endif
 disp_en_gpio_err:
 	return rc;
 }
@@ -371,6 +572,10 @@ ret:
 	return rc;
 }
 
+#if defined(CONFIG_TOUCHSCREEN_HIMAX_COMMON)
+extern void himax_lcd_resume_func(void);
+#endif
+
 int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
@@ -399,15 +604,54 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			   __func__, __LINE__);
 	}
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+        if (!gpio_is_valid(ctrl_pdata->px8418_reset_gpio)) {
+		pr_debug("%s:%d, px8418_reset gpio not configured\n",
+			   __func__, __LINE__);
+		return rc;
+	}
+#endif
+
 	if (!gpio_is_valid(ctrl_pdata->rst_gpio)) {
 		pr_debug("%s:%d, reset line not configured\n",
 			   __func__, __LINE__);
 		return rc;
 	}
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if (enable)
+	{
+		//SW4-HL-TP-B2N-NT36672-DoubleTap-00+{_20180302
+		switch (ctrl_pdata->panel_data.panel_info.panel_id)
+		{
+#if defined(CONFIG_FIH_ONYX)
+			case FIH_NT36672_FHD_CTC_B2N_VIDEO_PANEL:
+			case FIH_NT36672_H_GLASS_FHD_CTC_B2N_VIDEO_PANEL:
+				{
+					pr_debug("\n\n******************** [HL]%s, %d: FIH_NT36672_FHD_CTC_B2N_VIDEO_PANEL\n", __func__, __LINE__);
+					pr_debug("\n\n******************** [HL]%s, %d: gdouble_tap_enable_nvt = %d\n", __func__, __LINE__, gdouble_tap_enable_nvt);
+					if (gdouble_tap_enable_nvt)
+					{
+						gpio_set_value((ctrl_pdata->rst_gpio), 0);
+						gpio_free(ctrl_pdata->rst_gpio);
+					}
+				}
+				break;
+#endif
+		}
+#else
 	pr_debug("%s: enable = %d\n", __func__, enable);
 
 	if (enable) {
+#endif
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+                if((tp_gesture_wakeup() == 1) && (panel_hardware_id == 101)){
+                        gpio_direction_output(66, 0);
+                        msleep(2);
+                }
+                gpio_direction_output(66, 1);
+#endif
 		rc = mdss_dsi_request_gpios(ctrl_pdata);
 		if (rc) {
 			pr_err("gpio request failed\n");
@@ -423,6 +667,205 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 					goto exit;
 				}
 			}
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		//SW4-JasonSH-Display-BringUpFT8716U-00+{_20170619
+		switch (ctrl_pdata->panel_data.panel_info.panel_id)
+		{
+#if defined(CONFIG_FIH_CRYSTAL)
+			//SW4-HL-Display-CTL-GT915L-CTC_n_AUO-BringUp-00+{_20180226
+			case FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL:
+			case FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL:      //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+			case FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL:       //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+				{
+					pr_debug("\n\n******************** [HL]%s, %d: FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL <-- START\n", __func__, __LINE__);
+					//*************************************************************
+					//* HDR PX8418 reset sequence -- START
+					//*************************************************************
+					pr_debug("\n\n******************** [HL]%s, %d: HDR PX8418 reset sequence -- START\n", __func__, __LINE__);
+					rc = gpio_direction_output(ctrl_pdata->hdr_rst_gpio, 1);
+					if (rc) {
+						pr_err("%s: unable to set dir for rst gpio\n",
+							__func__);
+						goto exit;
+					}
+					for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) \
+					{
+						gpio_set_value((ctrl_pdata->hdr_rst_gpio),
+							pdata->panel_info.rst_seq[i]);
+
+						if (pdata->panel_info.rst_seq[++i])
+							usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+					}
+					pr_debug("\n\n******************** [HL]%s, %d: HDR PX8418 reset sequence -- END\n", __func__, __LINE__);
+					//*************************************************************
+					//* HDR PX8418 reset sequence -- END
+					//*************************************************************
+					if (pdata->panel_info.rst_seq_len) {
+						rc = gpio_direction_output(ctrl_pdata->rst_gpio,
+							pdata->panel_info.rst_seq[0]);
+						if (rc) {
+							pr_err("%s: unable to set dir for rst gpio\n",
+								__func__);
+							goto exit;
+						}
+					}
+
+					pr_debug("\n\n******************** [HL] %s, rst_seq_len = %d**********************\n\n", __func__, pdata->panel_info.rst_seq_len);
+					for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) \
+					{
+						gpio_set_value((ctrl_pdata->rst_gpio),
+							pdata->panel_info.rst_seq[i]);
+
+						if (pdata->panel_info.rst_seq[++i])
+							usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+					}
+
+					pr_debug("\n\n******************** [HL]%s, %d: FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL <-- END\n", __func__, __LINE__);
+				}
+				break;
+			//SW4-HL-Display-CTL-GT915L-CTC_n_AUO-BringUp-00+}_20180226
+#endif
+#if defined(CONFIG_FIH_TAISHAN)
+			case FIH_FT8719_1080P_VIDEO_PANEL:
+				{
+					if (pdata->panel_info.rst_seq_len) {
+						/*rc = gpio_direction_output(ctrl_pdata->tp_rst_gpio,pdata->panel_info.rst_seq[0]);
+						if (rc) {
+							pr_err("%s: unable to set dir for rst gpio\n",
+								__func__);
+							goto exit;
+						}
+						gpio_set_value((ctrl_pdata->tp_rst_gpio), 1);
+						usleep_range(2 * 1000, 2 * 1000);*/
+
+						rc = gpio_direction_output(ctrl_pdata->rst_gpio,
+							pdata->panel_info.rst_seq[0]);
+						if (rc) {
+							pr_err("%s: unable to set dir for rst gpio\n",
+								__func__);
+							goto exit;
+						}
+					}
+
+					for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
+						gpio_set_value((ctrl_pdata->rst_gpio),
+							pdata->panel_info.rst_seq[i]);
+						if (pdata->panel_info.rst_seq[++i])
+							usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+					}
+				}
+				break;
+#endif
+#if defined(CONFIG_FIH_PLATE2)
+			case FIH_FT8716U_1080P_CTC_VIDEO_PANEL:
+				{
+					if (pdata->panel_info.rst_seq_len) {
+						rc = gpio_direction_output(ctrl_pdata->rst_gpio,
+							pdata->panel_info.rst_seq[0]);
+						if (rc) {
+							pr_err("%s: unable to set dir for rst gpio\n",
+								__func__);
+							goto exit;
+						}
+						rc = gpio_direction_output(ctrl_pdata->tp_rst_gpio,pdata->panel_info.rst_seq[0]);
+						if (rc) {
+							pr_err("%s: unable to set dir for rst gpio\n",
+								__func__);
+							goto exit;
+						}
+					}
+					pr_debug("\n\n******************** [JasonSH] %s, rst_seq_len = %d**********************\n\n", __func__, pdata->panel_info.rst_seq_len);
+					for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
+						gpio_set_value((ctrl_pdata->rst_gpio),
+							pdata->panel_info.rst_seq[i]);
+						gpio_set_value(ctrl_pdata->tp_rst_gpio,pdata->panel_info.rst_seq[i]);
+						if (pdata->panel_info.rst_seq[++i])
+							usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+						pr_debug("\n\n******************** [JasonSH] %s, i = %d , add tp reset**********************\n\n", __func__, i);
+					}
+				}
+				break;
+			case FIH_R69338_1080P_VIDEO_PANEL_PL2:
+				{
+					if (pdata->panel_info.rst_seq_len) {
+						rc = gpio_direction_output(ctrl_pdata->rst_gpio,
+							pdata->panel_info.rst_seq[0]);
+						if (rc) {
+							pr_err("%s: unable to set dir for rst gpio\n",
+								__func__);
+							goto exit;
+						}
+					}
+					pr_debug("\n\n******************** [JasonSH] %s, rst_seq_len = %d**********************\n\n", __func__, pdata->panel_info.rst_seq_len);
+					for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
+						gpio_set_value((ctrl_pdata->rst_gpio),
+							pdata->panel_info.rst_seq[i]);
+						if (pdata->panel_info.rst_seq[++i])
+							usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+						pr_debug("\n\n******************** [JasonSH] %s, i = %d , add tp reset**********************\n\n", __func__, i);
+					}
+				}
+				break;
+#endif
+			default:
+				{
+					if (pdata->panel_info.rst_seq_len) {
+						rc = gpio_direction_output(ctrl_pdata->rst_gpio,
+							pdata->panel_info.rst_seq[0]);
+						if (rc) {
+							pr_err("%s: unable to set dir for rst gpio\n",
+								__func__);
+							goto exit;
+						}
+					}
+					pr_debug("\n\n******************** [HL] %s, rst_seq_len = %d**********************\n\n", __func__, pdata->panel_info.rst_seq_len);
+					for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
+						gpio_set_value((ctrl_pdata->rst_gpio),
+							pdata->panel_info.rst_seq[i]);
+						if (pdata->panel_info.rst_seq[++i])
+							usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+					}
+				}
+				break;
+		}
+		//SW4-JasonSH-Display-BringUpFT8716U-00+}_20170619
+
+		pr_debug("\n\n******************** [HL] %s, for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) **********************\n\n", __func__);
+			if (gpio_is_valid(ctrl_pdata->bklt_en_gpio)) {
+
+				if (ctrl_pdata->bklt_en_gpio_invert)
+					rc = gpio_direction_output(
+						ctrl_pdata->bklt_en_gpio, 0);
+				else
+					rc = gpio_direction_output(
+						ctrl_pdata->bklt_en_gpio, 1);
+
+				if (rc) {
+					pr_err("%s: unable to set dir for bklt gpio\n",
+						__func__);
+					goto exit;
+				}
+			}
+#else
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+                        if (pdata->panel_info.rst_seq_len) {
+				rc = gpio_direction_output(ctrl_pdata->px8418_reset_gpio,
+					pdata->panel_info.rst_seq[0]);
+				if (rc) {
+					pr_err("%s: unable to set dir for px8418_reset gpio\n",
+						__func__);
+					goto exit;
+				}
+			}
+
+			for (i = 0; i < pdata->panel_info.rst_seq_len; ++i) {
+				gpio_set_value((ctrl_pdata->px8418_reset_gpio),
+					pdata->panel_info.rst_seq[i]);
+				if (pdata->panel_info.rst_seq[++i])
+					usleep_range(pinfo->rst_seq[i] * 1000, pinfo->rst_seq[i] * 1000);
+			}
+#endif
 
 			if (pdata->panel_info.rst_seq_len) {
 				rc = gpio_direction_output(ctrl_pdata->rst_gpio,
@@ -441,7 +884,11 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 					usleep_range(pinfo->rst_seq[i] * 1000,
 						pinfo->rst_seq[i] * 1000);
 			}
-
+#endif
+#if defined(CONFIG_TOUCHSCREEN_HIMAX_COMMON)
+                        if(panel_hardware_id == 110)
+                            himax_lcd_resume_func();
+#endif
 			if (gpio_is_valid(ctrl_pdata->avdd_en_gpio)) {
 				if (ctrl_pdata->avdd_en_gpio_invert) {
 					rc = gpio_direction_output(
@@ -483,6 +930,9 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			ctrl_pdata->ctrl_state &= ~CTRL_STATE_PANEL_INIT;
 			pr_debug("%s: Reset panel done\n", __func__);
 		}
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+                   lcd_need_reset = 0;
+#endif
 	} else {
 		if (gpio_is_valid(ctrl_pdata->avdd_en_gpio)) {
 			if (ctrl_pdata->avdd_en_gpio_invert)
@@ -496,15 +946,97 @@ int mdss_dsi_panel_reset(struct mdss_panel_data *pdata, int enable)
 			gpio_set_value((ctrl_pdata->disp_en_gpio), 0);
 			gpio_free(ctrl_pdata->disp_en_gpio);
 		}
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		//SW4-JasonSH-Display-BringUpFT8716U-00+{_20170619
+		switch (ctrl_pdata->panel_data.panel_info.panel_id)
+		{
+#if defined(CONFIG_FIH_CRYSTAL)
+			//SW4-HL-LCM-CTL-OTM1911A-FixNotBeAbleToLightedUpInOS-00+{_20180315
+			case FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL:
+			case FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL:      //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+			case FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL:       //SW4-HL-CTL-HDR-ReadLcmSwId-00+_20180330
+				{
+					pr_debug("\n\n******************** [HL]%s, %d: FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL\n", __func__, __LINE__);
+					if (gpio_is_valid(ctrl_pdata->rst_gpio))
+					{
+						pr_debug("\n\n******************** [HL]%s, %d: ctrl_pdata->rst_gpio PULL DOWN\n", __func__, __LINE__);
+						gpio_set_value((ctrl_pdata->rst_gpio), 0);
+						gpio_free(ctrl_pdata->rst_gpio);
+					}
+
+					if (gpio_is_valid(ctrl_pdata->hdr_rst_gpio))
+					{
+						pr_debug("\n\n******************** [HL]%s, %d: ctrl_pdata->hdr_rst_gpio PULL DOWN\n", __func__, __LINE__);
+						gpio_set_value((ctrl_pdata->hdr_rst_gpio), 0);
+						gpio_free(ctrl_pdata->hdr_rst_gpio);
+					}
+				}
+				break;
+			//SW4-HL-LCM-CTL-OTM1911A-FixNotBeAbleToLightedUpInOS-00+}_20180315
+#endif
+#if defined(CONFIG_FIH_TAISHAN)
+			case FIH_FT8719_1080P_VIDEO_PANEL:
+				{
+					gpio_set_value((ctrl_pdata->rst_gpio), 0);
+					gpio_set_value((ctrl_pdata->tp_rst_gpio), 0);
+					gpio_free(ctrl_pdata->rst_gpio);
+					gpio_free(ctrl_pdata->tp_rst_gpio);
+				}
+				break;
+#endif
+#if defined(CONFIG_FIH_PLATE2)
+			case FIH_FT8716U_1080P_CTC_VIDEO_PANEL:
+				{
+					gpio_set_value((ctrl_pdata->rst_gpio), 0);
+					gpio_set_value((ctrl_pdata->tp_rst_gpio), 0);
+					gpio_free(ctrl_pdata->rst_gpio);
+					gpio_free(ctrl_pdata->tp_rst_gpio);
+				}
+				break;
+			case FIH_R69338_1080P_VIDEO_PANEL_PL2:
+				{
+					gpio_set_value((ctrl_pdata->rst_gpio), 0);
+					gpio_free(ctrl_pdata->rst_gpio);
+				}
+				break;
+#endif
+			default:
+				{
+					gpio_set_value((ctrl_pdata->rst_gpio), 0);
+					gpio_free(ctrl_pdata->rst_gpio);
+				}
+				break;
+		}
+		//SW4-JasonSH-Display-BringUpFT8716U-00+}_20170619
+#elif defined(CONFIG_LONGCHEER_SDM660_PROJS)
+                /*modify by shenwenbin for M690 display 20190312 begin*/
+                gpio_set_value((ctrl_pdata->px8418_reset_gpio), 0);
+		gpio_free(ctrl_pdata->px8418_reset_gpio);
+                /*modify by shenwenbin for M690 display 20190312 end*/
+
+                /*modify by shenwenbin for open double tap wakeup 20190516 begin*/
+                if(tp_gesture_wakeup() == 1)
+                        pr_debug("%s: touch have opened double wakeup function\n", __func__);
+                else{
+                        gpio_direction_output(66, 0);   //add by shenwenbin for TP timing 20190313
+        		gpio_set_value((ctrl_pdata->rst_gpio), 0);
+        		gpio_free(ctrl_pdata->rst_gpio);
+                }
+                /*modify by shenwenbin for open double tap wakeup 20190516 end*/
+#else
 		gpio_set_value((ctrl_pdata->rst_gpio), 0);
 		gpio_free(ctrl_pdata->rst_gpio);
+#endif
 		if (gpio_is_valid(ctrl_pdata->lcd_mode_sel_gpio)) {
 			gpio_set_value(ctrl_pdata->lcd_mode_sel_gpio, 0);
 			gpio_free(ctrl_pdata->lcd_mode_sel_gpio);
 		}
 	}
 
+
 exit:
+	pr_warn("\n[HL] %s ---, rc = %d\n", __func__, rc);
+
 	return rc;
 }
 
@@ -644,6 +1176,12 @@ static void mdss_dsi_send_col_page_addr(struct mdss_dsi_ctrl_pdata *ctrl,
 	/* Send default or dual roi 2A/2B cmd */
 	cmdreq.cmds = dual_roi ? set_dual_col_page_addr_cmd :
 		set_col_page_addr_cmd;
+
+#if defined(CONFIG_PXLW_IRIS3)
+	if (iris_is_valid_cfg())
+		iris_panel_cmd_passthrough(ctrl, &cmdreq);
+#endif
+
 	mdss_dsi_cmdlist_put(ctrl, &cmdreq);
 }
 
@@ -846,11 +1384,17 @@ static void mdss_dsi_panel_switch_mode(struct mdss_panel_data *pdata,
 		mdss_dsi_panel_dsc_pps_send(ctrl_pdata, &pdata->panel_info);
 }
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static int old_bl_level = 0;	//SW4-HL-TP-EnableDisableIrqRightAfterOrBeforeLcmDisplayOnOrdisplayOff-00+_20170515
+#endif
 static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 							u32 bl_level)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
 	struct mdss_dsi_ctrl_pdata *sctrl = NULL;
+#if defined(CONFIG_PXLW_IRIS3)
+        struct iris_setting_info *psetting = NULL;
+#endif
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -859,6 +1403,9 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 
 	ctrl_pdata = container_of(pdata, struct mdss_dsi_ctrl_pdata,
 				panel_data);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#endif
 
 	/*
 	 * Some backlight controllers specify a minimum duty cycle
@@ -871,11 +1418,121 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 	if (pdata->panel_disable_mode && (bl_level != 0))
 		return;
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	//SW4-HL-TP-EnableDisableIrqRightAfterOrBeforeLcmDisplayOnOrdisplayOff-00+{_20170515
+	pr_debug("\n\n*** [HL] %s: ctrl_pdata->panel_data.panel_info.panel_id = %d ***n\n", __func__, ctrl_pdata->panel_data.panel_info.panel_id);
+	switch (ctrl_pdata->panel_data.panel_info.panel_id)
+	{
+#if defined(CONFIG_FIH_DRAGON) || defined(CONFIG_FIH_TAISHAN)
+		case FIH_CTC_OTM1911A_FHD_VIDEO_PANEL:
+		case FIH_AUO_OTM1911A_FHD_VIDEO_PANEL:
+		{
+			pr_debug("\n\n*** [HL] %s: FIH_CTC_OTM1911A_FHD_VIDEO_PANEL OR FIH_AUO_OTM1911A_FHD_VIDEO_PANEL ***\n\n", __func__);
+			if (bl_level == 0)
+			{
+				//Disable TP righ before backlight is turned off
+				pr_debug("\n\n*** [HL] %s, fih_goodix_ts_suspend() <-- START ***n\n", __func__);
+				fih_goodix_ts_suspend();
+				pr_debug("\n\n*** [HL] %s, fih_goodix_ts_suspend() <-- END ***n\n", __func__);
+				//TBD - FixRedScreenWhileShutdownBacklighLed
+			}
+		}
+		break;
+#endif
+#if defined(CONFIG_FIH_CRYSTAL)
+		case FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL:
+		case FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL:
+		case FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL:
+		{
+			pr_debug("\n\n*** [HL] %s: FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL ***\n\n", __func__);
+			if (bl_level == 0)
+			{
+				//Disable TP righ before backlight is turned off
+				pr_debug("\n\n*** [HL] %s, fih_goodix_ts_suspend() <-- START ***n\n", __func__);
+				fih_goodix_ts_suspend();
+				pr_debug("\n\n*** [HL] %s, fih_goodix_ts_suspend() <-- END ***n\n", __func__);
+				//TBD - FixRedScreenWhileShutdownBacklighLed
+			}
+		}
+		break;
+#endif
+#if defined(CONFIG_FIH_CHARM)
+		case FIH_ILI7807E_1080P_VIDEO_PANEL:
+			{
+				pr_debug("\n\n*** [HL] %s: FIH_ILI7807E_1080P_VIDEO_PANEL ***\n\n", __func__);
+				if (bl_level == 0)
+				{
+					pr_debug("\n\n*** [HL] %s, fih_tp_lcm_suspend() <-- START ***n\n", __func__);
+					fih_tp_lcm_suspend();
+					pr_debug("\n\n*** [HL] %s, fih_tp_lcm_suspend() <-- END ***n\n", __func__);
+					//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-00+{_20170614
+					//Send black pattern before power off backlihg LED to fix red screen issue
+					if (ctrl_pdata->bist_mode_black_pattern_cmds.cmd_cnt)
+					{
+						mdss_dsi_panel_cmds_send(ctrl_pdata, &ctrl_pdata->bist_mode_black_pattern_cmds, CMD_REQ_COMMIT);
+						BistMode = 1;	//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-01+_20170809
+					}
+					//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-00+}_20170614
+				}
+
+				if ((old_bl_level == 0) && (bl_level != 0))
+				{
+					//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-01+{_20170809
+					if (BistMode)
+					{
+						//Disable bist mode after backlight is turned off
+						if (ctrl_pdata->bist_mode_off_cmds.cmd_cnt)
+						{
+							mdss_dsi_panel_cmds_send(ctrl_pdata, &ctrl_pdata->bist_mode_off_cmds, CMD_REQ_COMMIT);
+							BistMode = 0;
+						}
+					}
+					//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-01+}_20170809
+
+					//SW4-HL-Touch-FixTpNotWorkByQuickPressPowerKeyTwiceWhenDoubleTapEnabled-00+{_20170711
+					pr_debug("\n\n*** [HL] %s: fih_tp_lcm_resume_sensing_start() <-- START ***\n\n", __func__);
+					fih_tp_lcm_resume_sensing_start();
+					pr_debug("\n\n*** [HL] %s: fih_tp_lcm_resume_sensing_start() <-- END ***\n\n", __func__);
+					//SW4-HL-Touch-FixTpNotWorkByQuickPressPowerKeyTwiceWhenDoubleTapEnabled-00+}_20170711
+				}
+			}
+			break;
+#endif
+#if defined(CONFIG_FIH_ONYX)
+		case FIH_NT36672_FHD_CTC_B2N_VIDEO_PANEL:
+		case FIH_NT36672_H_GLASS_FHD_CTC_B2N_VIDEO_PANEL:
+			{
+				pr_debug("\n\n*** [HL] %s: FIH_NT36672_FHD_CTC_B2N_VIDEO_PANEL ***\n\n", __func__);
+				if (bl_level == 0)
+				{
+					//Disable TP right before backlight is turned off
+					pr_debug("\n\n*** [HL] %s, fih_nvt_ts_suspend() <-- START ***n\n", __func__);
+					fih_nvt_ts_suspend();
+					pr_debug("\n\n*** [HL] %s, fih_nvt_ts_suspend() <-- END ***n\n", __func__);
+				}
+			}
+			break;
+#endif
+		default:
+			break;
+	}
+	//SW4-HL-TP-EnableDisableIrqRightAfterOrBeforeLcmDisplayOnOrdisplayOff-00+}_20170515
+#endif
+
 	if ((bl_level < pdata->panel_info.bl_min) && (bl_level != 0))
 		bl_level = pdata->panel_info.bl_min;
 
 	/* enable the backlight gpio if present */
 	mdss_dsi_bl_gpio_ctrl(pdata, bl_level);
+
+#if defined(CONFIG_PXLW_IRIS3)
+	psetting = iris_get_setting();
+	psetting->quality_cur.system_brightness = bl_level;
+	/* Don't set panel's brightness during HDR/SDR2HDR */
+	/* Set panel's brightness when sdr2hdr mode is 3 */
+	if (iris_is_valid_cfg() && psetting->quality_cur.pq_setting.sdr2hdr != SDR2HDR_Bypass && iris_get_sdr2hdr_mode() != 3)
+		return;
+#endif
 
 	switch (ctrl_pdata->bklt_ctrl) {
 	case BL_WLED:
@@ -917,13 +1574,97 @@ static void mdss_dsi_panel_bl_ctrl(struct mdss_panel_data *pdata,
 			__func__);
 		break;
 	}
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if ((bl_level == 0) || ((old_bl_level == 0) && (bl_level != 0)))
+	{
+		pr_err("%s: level=%d\n", __func__, bl_level);
+	}
+
+	pr_debug("\n\n*** [HL] %s: ctrl_pdata->panel_data.panel_info.panel_id = %d ***n\n", __func__, ctrl_pdata->panel_data.panel_info.panel_id);
+	switch (ctrl_pdata->panel_data.panel_info.panel_id)
+	{
+#if defined(CONFIG_FIH_DRAGON) || defined(CONFIG_FIH_TAISHAN)
+		case FIH_CTC_OTM1911A_FHD_VIDEO_PANEL:
+		case FIH_AUO_OTM1911A_FHD_VIDEO_PANEL:
+		{
+			pr_debug("\n\n*** [HL] %s: FIH_CTC_OTM1911A_FHD_VIDEO_PANEL OR FIH_AUO_OTM1911A_FHD_VIDEO_PANEL ***\n\n", __func__);
+			if ((old_bl_level == 0) && (bl_level != 0))
+			{
+				pr_debug("\n\n*** [HL] %s: fih_goodix_ts_resume() <-- START ***n\n", __func__);
+				fih_goodix_ts_resume();
+				pr_debug("\n\n*** [HL] %s: fih_goodix_ts_resume() <-- END ***n\n", __func__);
+			}
+		}
+		break;
+#endif
+#if defined(CONFIG_FIH_CRYSTAL)
+		case FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL:
+		case FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL:
+		case FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL:
+		{
+			pr_debug("\n\n*** [HL] %s: FIH_CTC_OTM1911A_FHD_VIDEO_PANEL OR FIH_AUO_OTM1911A_FHD_VIDEO_PANEL OR FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL ***\n\n", __func__);
+			if ((old_bl_level == 0) && (bl_level != 0))
+			{
+				pr_debug("\n\n*** [HL] %s: fih_goodix_ts_resume() <-- START ***n\n", __func__);
+				fih_goodix_ts_resume();
+				pr_debug("\n\n*** [HL] %s: fih_goodix_ts_resume() <-- END ***n\n", __func__);
+			}
+		}
+		break;
+#endif
+#if defined(CONFIG_FIH_CHARM)
+		case FIH_ILI7807E_1080P_VIDEO_PANEL:
+			{
+				pr_debug("\n\n*** [HL] %s: FIH_ILI7807E_1080P_VIDEO_PANEL ***\n\n", __func__);
+				if ((old_bl_level == 0) && (bl_level != 0))
+				{
+					pr_debug("\n\n*** [HL] %s: fih_tp_lcm_resume() <-- START ***n\n", __func__);
+					fih_tp_lcm_resume();
+					pr_debug("\n\n*** [HL] %s: fih_tp_lcm_resume() <-- END ***n\n", __func__);
+				}
+			}
+			break;
+#endif
+#if defined(CONFIG_FIH_ONYX)
+		case FIH_NT36672_FHD_CTC_B2N_VIDEO_PANEL:
+		case FIH_NT36672_H_GLASS_FHD_CTC_B2N_VIDEO_PANEL:
+			{
+				pr_debug("\n\n*** [HL] %s: FIH_NT36672_FHD_CTC_B2N_VIDEO_PANEL ***\n\n", __func__);
+				if ((old_bl_level == 0) && (bl_level != 0))
+				{
+					pr_debug("\n\n*** [HL] %s: fih_nvt_ts_resume() <-- START ***n\n", __func__);
+					fih_nvt_ts_resume();
+					pr_debug("\n\n*** [HL] %s: fih_nvt_ts_resume() <-- END ***n\n", __func__);
+				}
+			}
+			break;
+#endif
+		default:
+			break;
+	}
+
+	old_bl_level = bl_level;	//SW4-HL-TP-EnableDisableIrqRightAfterOrBeforeLcmDisplayOnOrdisplayOff-00+_20170515
+#endif
 }
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static char power_status_reg[2] = {0x0A, 0x00};	//SW4-HL-Display-ShowLCMAndBacklightStatus-00+_20160304
+#endif
 static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 	struct mdss_panel_info *pinfo;
 	struct dsi_panel_cmds *on_cmds;
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	int len;
+#endif
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	int len = 1;		//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+	int res  = -EPERM;	//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+	char *rx_buf;		//SW4-HL-Display-ShowLCMAndBacklightStatus-00+_20160304
+	int RetryReadPanelStatus = 0;	//SW4-HL-Display-CutOffPowerIfDdicStatusIsnotCorrect-00+_20160912
+#endif
 	int ret = 0;
 
 	if (pdata == NULL) {
@@ -951,8 +1692,363 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 	pr_debug("%s: ndx=%d cmd_cnt=%d\n", __func__,
 				ctrl->ndx, on_cmds->cmd_cnt);
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#if defined(CONFIG_PXLW_IRIS3)
+	len = on_cmds->cmd_cnt;
+#if defined(IRIS3_ABYP_LIGHTUP)
+	// Use Iris3 Analog bypass mode to light up panel
+	// Assume the AP output is LP11 here
+	iris_abyp_lightup(ctrl);
+#else
+	if (iris_is_valid_cfg()) {
+		if (iris_abyp_lightup_get() == 0) {
+			iris_lightup(ctrl, on_cmds);
+			len = 0;
+		} else {
+			iris_abyp_lightup(ctrl);
+		}
+	}
+#endif
+	if (len)
+#else
+	if (on_cmds->cmd_cnt)
+#endif
+		mdss_dsi_panel_cmds_send(ctrl, on_cmds, CMD_REQ_COMMIT);
+#endif
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	//SW4-HL-Touch-ImplementDoubleTap-00+{_20170623
+	switch (ctrl->panel_data.panel_info.panel_id)
+	{
+#if defined(CONFIG_FIH_CHARM)
+		case FIH_ILI7807E_1080P_VIDEO_PANEL:
+			{
+				pr_debug("\n\n*** [HL] %s: FIH_ILI7807E_1080P_VIDEO_PANEL ***\n\n", __func__);
+				pr_debug("\n\n*** [HL] %s: fih_tp_lcm_resume_lpwg_off() <-- START ***\n\n", __func__);
+				ret = fih_tp_lcm_resume_lpwg_off();
+				pr_debug("\n\n******************** [HL]%s: ret = %d\n", __func__, ret);
+				if (ret)
+				{
+					//***********************************
+					//* START of Power Down TP IC and DDIC
+					//***********************************
+					pr_debug("\n\n******************** [HL]%s: START of Power Down TP IC and DDIC\n", __func__);
+					//Pull LOW DDIC RESET pin
+					if (gpio_request(ctrl->rst_gpio, "tp_rst")) {
+						pr_err("%s:request ddic reset gpio failed\n", __func__);
+						gpio_free(ctrl->rst_gpio);
+					}
+					gpio_set_value(ctrl->rst_gpio, 0);
+					gpio_free(ctrl->rst_gpio);
+					pr_debug("\n\n******************** [HL]%s: Pull LOW DDIC RESET pin\n", __func__);
+
+					//Pull LOW DDIC/TPIC POWER
+					ret = msm_dss_enable_vreg(
+							ctrl->panel_power_data.vreg_config,
+							ctrl->panel_power_data.num_vreg, 0);
+					if (ret)
+						pr_err("%s: failed to disable vregs for %s\n",
+							__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
+					pr_debug("\n\n******************** [HL]%s: Pull LOW DDIC/TPIC POWER\n", __func__);
+
+					//Pull LOW TP RESET Pin
+					if (gpio_request(ctrl->tp_rst_gpio, "tp_rst")) {
+						pr_err("%s:request tp reset gpio failed\n", __func__);
+						gpio_free(ctrl->tp_rst_gpio);
+					}
+					gpio_set_value(ctrl->tp_rst_gpio, 0);
+					gpio_free(ctrl->tp_rst_gpio);
+					pr_debug("\n\n******************** [HL]%s: Pull LOW TP RESET Pin\n", __func__);
+					pr_debug("\n\n******************** [HL]%s: END of Power Down TP IC and DDIC\n", __func__);
+					//***********************************
+					//* END of Power Down TP IC and DDIC
+					//***********************************
+
+					//***********************************
+					//* START of Power UP TP IC and DDIC
+					//***********************************
+					pr_debug("\n\n******************** [HL]%s: START of Power UP TP IC and DDIC\n", __func__);
+					pr_debug("\n\n******************** [HL]%s: Pull HIGH DDIC/TPIC POWER\n", __func__);
+					ret = msm_dss_enable_vreg(
+							ctrl->panel_power_data.vreg_config,
+							ctrl->panel_power_data.num_vreg, 1);
+					if (ret) {
+						pr_err("%s: failed to enable vregs for %s\n",
+							__func__, __mdss_dsi_pm_name(DSI_PANEL_PM));
+						return ret;
+					}
+					pr_debug("\n\n******************** [HL]%s: Pull HIGH DDIC/TPIC POWER\n", __func__);
+
+					//Pull HIGH TP RESET Pin
+					if (gpio_request(ctrl->tp_rst_gpio, "tp_rst")) {
+						pr_err("%s:request tp reset gpio failed\n", __func__);
+						gpio_free(ctrl->tp_rst_gpio);
+					}
+					gpio_set_value(ctrl->tp_rst_gpio, 1);
+					gpio_free(ctrl->tp_rst_gpio);
+					pr_debug("\n\n******************** [HL]%s: Pull HIGH TP RESET Pin\n", __func__);
+
+					//Pull HIGH DDIC RESET pin
+					ret = mdss_dsi_panel_reset(pdata, 1);
+					if (ret)
+						pr_err("%s: Panel reset failed. rc=%d\n",
+								__func__, ret);
+					gpio_free(ctrl->rst_gpio);
+					pr_debug("\n\n******************** [HL]%s: Pull HIGH DDIC RESET pin\n", __func__);
+					pr_debug("\n\n******************** [HL]%s: END of Power UP TP IC and DDIC\n", __func__);
+					//***********************************
+					//* END of Power UP TP IC and DDIC
+					//***********************************
+				}
+				pr_debug("\n\n*** [HL] %s: fih_tp_lcm_resume_lpwg_off() <-- END ***\n\n", __func__);
+			}
+			break;
+#endif
+		default:
+			pr_debug("\n\n*** [HL] %s: default ***\n\n", __func__);
+			break;
+	}
+	//SW4-HL-Touch-ImplementDoubleTap-00+}_20170623
+
+	//SW4-JasonSH-Display-EnhanceErrorHandling-00*{_20170518
+#if defined(CONFIG_PXLW_IRIS3)
+	len = on_cmds->cmd_cnt;
+#if defined(IRIS3_ABYP_LIGHTUP)
+		// Use Iris3 Analog bypass mode to light up panel
+		// Assume the AP output is LP11 here
+		iris_abyp_lightup(ctrl);
+#else
+		if (iris_is_valid_cfg()) {
+			if (iris_abyp_lightup_get() == 0) {
+				iris_lightup(ctrl, on_cmds);
+				len = 0;
+			} else {
+				iris_abyp_lightup(ctrl);
+			}
+		}
+#endif
+	if (len)
+#else
+ 	if (on_cmds->cmd_cnt)
+#endif
+	{
+		//SW4-HL-Display-ShowLCMAndBacklightStatus-00+{_20160304
+		if ((strstr(saved_command_line, "androidboot.device=C1N") != NULL)
+                        || (strstr(saved_command_line, "androidboot.device=DRG") != NULL)
+                        || (strstr(saved_command_line, "androidboot.device=CTL") != NULL))
+		{
+			if (!(strnstr(saved_command_line, "androidboot.fihmode=2", strlen(saved_command_line))))
+			{
+				//SW4-HL-Display-C1NO-3148-00+{_20180508
+				if (ctrl->panel_data.panel_info.panel_id == FIH_ILI7807E_1080P_VIDEO_PANEL)
+				{
+					if (ctrl->mipi_term_resistor_04h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_04h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_04h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_04h_cmds\n", __func__, __LINE__);
+					}
+					else if (ctrl->mipi_term_resistor_14h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_14h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_14h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_14h_cmds\n", __func__, __LINE__);
+					}
+					else if (ctrl->mipi_term_resistor_24h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_24h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_24h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_24h_cmds\n", __func__, __LINE__);
+					}
+					else if (ctrl->mipi_term_resistor_34h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_34h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_34h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_34h_cmds\n", __func__, __LINE__);
+					}
+					else
+					{
+						pr_err("[HL]%s, %d: NOOOOOOOOOOOOOOOOOOOOOOOOOOOOO to send mipi term resistor cmdpage cmds ...\n", __func__, __LINE__);
+					}
+				}
+				//SW4-HL-Display-C1NO-3148-00+}_20180508
+
+				if (ctrl->switch_cmdpage_cmds.cmd_cnt)
+				{
+					len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->switch_cmdpage_cmds, CMD_REQ_COMMIT);
+				}
+
+				rx_buf = kzalloc(PANEL_REG_ADDR_LEN, GFP_KERNEL);
+
+				//SW4-HL-Display-CutOffPowerIfDdicStatusIsnotCorrect-00*{_20160912
+				do
+				{
+					mdss_dsi_panel_cmd_read(ctrl, power_status_reg[0], power_status_reg[1],
+                                                                        NULL, rx_buf, 1);
+
+                                        if ((ctrl->panel_data.panel_info.panel_id == FIH_CTL_CTC_OTM1911A_FHD_VIDEO_PANEL) || (ctrl->panel_data.panel_info.panel_id == FIH_CTL_AUO_OTM1911A_FHD_VIDEO_PANEL) || (ctrl->panel_data.panel_info.panel_id == FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL))
+                                        {
+                                            if ((rx_buf[0] == 0x18) || (rx_buf[0] == 0x08))
+                                            {
+                                                    pr_err("%s: HDR ic is alive, status = 0x%x\n", __func__, rx_buf[0]);
+                                                    break;
+                                            }
+
+                                            mdelay(100);
+
+                                            pr_err("%s: HDR ic is not alive, RetryReadPanelStatus = %d\n", __func__, RetryReadPanelStatus);
+                                        }
+                                        else
+                                        {
+                                            if (rx_buf[0] == 0x08)
+                                            {
+                                                    pr_err("%s: LCM driver ic mipi interface is workable, status = 0x%x\n", __func__, rx_buf[0]);
+                                                    break;
+                                            }
+                                            else
+                                            {
+                                                    pr_err("%s: LCM driver ic mipi interface is not workable, status = 0x%x\n", __func__, rx_buf[0]);
+                                                    if ((rx_buf[0] == 0x98) || (rx_buf[0] == 0x9c))
+                                                    {
+                                                            pr_err("%s: Bypass 0x08 check mechanism and then let system send initial code to lcm driver ic if lcm power state(0x0A) is 0x98 or 0x9C\n", __func__);
+                                                            break;
+                                                    }
+                                            }
+
+                                            mdelay(100);
+
+                                            pr_err("%s: LCM driver ic mipi interface is not workable, RetryReadPanelStatus = %d\n", __func__, RetryReadPanelStatus);
+                                        }
+
+					RetryReadPanelStatus++;
+				}
+				while (RetryReadPanelStatus < 3);
+
+				if (RetryReadPanelStatus >= 3)
+				{
+					pr_err("%s: RetryReadPanelStatus >= 3, LCM driver ic mipi interface is not workable\n", __func__);
+					kfree(rx_buf);
+					goto power_status_not_08_fail;
+				}
+
+				kfree(rx_buf);
+			}
+		}
+		//SW4-HL-Display-ShowLCMAndBacklightStatus-00+}_20160304
+
+		len = mdss_dsi_panel_cmds_send(ctrl, on_cmds, CMD_REQ_COMMIT);
+		if (!len)
+		{
+			goto cmds_fail;
+		}
+
+		DispOff = 0;	//SW4-HL-Display-NT35597-Fix_JGR-5432-AvoidCabcOffCmdIsSentDuring0x28And0x11Cmd-00+_20160601
+
+		if ((strstr(saved_command_line, "androidboot.device=C1N") != NULL)
+		     || (strstr(saved_command_line, "androidboot.device=B2N") != NULL)
+		     || (strstr(saved_command_line, "androidboot.device=DRG") != NULL)
+		     || (strstr(saved_command_line, "androidboot.device=CTL") != NULL) )
+		{
+			//SW4-HL-Display-ShowLCMAndBacklightStatus-00+{_20160304
+			if (!(strnstr(saved_command_line, "androidboot.fihmode=2", strlen(saved_command_line))))
+			{
+				//SW4-HL-Display-C1NO-3148-00+{_20180508
+				if (ctrl->panel_data.panel_info.panel_id == FIH_ILI7807E_1080P_VIDEO_PANEL)
+				{
+					if (ctrl->mipi_term_resistor_04h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_04h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_04h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_04h_cmds\n", __func__, __LINE__);
+					}
+					else if (ctrl->mipi_term_resistor_14h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_14h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_14h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_14h_cmds\n", __func__, __LINE__);
+					}
+					else if (ctrl->mipi_term_resistor_24h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_24h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_24h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_24h_cmds\n", __func__, __LINE__);
+					}
+					else if (ctrl->mipi_term_resistor_34h_cmds.cmd_cnt)
+					{
+						pr_debug("[HL]%s, %d: START to send mipi_term_resistor_34h_cmds ...\n", __func__, __LINE__);
+						len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->mipi_term_resistor_34h_cmds, CMD_REQ_COMMIT);
+						pr_debug("[HL]%s, %d: END to send mipi_term_resistor_34h_cmds\n", __func__, __LINE__);
+					}
+					else
+					{
+						pr_err("[HL]%s, %d: NOOOOOOOOOOOOOOOOOOOOOOOOOOOOO to send mipi term resistor cmdpage cmds ...\n", __func__, __LINE__);
+					}
+				}
+				//SW4-HL-Display-C1NO-3148-00+}_20180508
+
+				if (ctrl->switch_cmdpage_cmds.cmd_cnt)
+				{
+					len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->switch_cmdpage_cmds, CMD_REQ_COMMIT);
+				}
+
+				rx_buf = kzalloc(PANEL_REG_ADDR_LEN, GFP_KERNEL);
+
+				//SW4-HL-Display-CutOffPowerIfDdicStatusIsnotCorrect-00*{_20160912
+				do
+				{
+					mdss_dsi_panel_cmd_read(ctrl, power_status_reg[0], power_status_reg[1],
+                                                                        NULL, rx_buf, 1);
+
+                                        if (ctrl->panel_data.panel_info.panel_id == FIH_CTL_CTC_JD9522Z_FHD_VIDEO_PANEL)
+                                        {
+                                                    if (rx_buf[0] == 0x18)
+                                                    {
+                                                            pr_err("%s: LCM Driver IC is alive, status = 0x%x\n", __func__, rx_buf[0]);
+                                                            break;
+                                                    }
+                                                    else
+                                                    {
+                                                            pr_err("%s: LCM Driver IC is not alive, status = 0x%x\n", __func__, rx_buf[0]);
+                                                    }
+                                        }
+                                        else
+                                        {
+                                                    if (rx_buf[0] == 0x9C)
+                                                    {
+                                                            pr_err("%s: LCM Driver IC is alive, status = 0x%x\n", __func__, rx_buf[0]);
+                                                            break;
+                                                    }
+                                                    else
+                                                    {
+                                                            pr_err("%s: LCM Driver IC is not alive, status = 0x%x\n", __func__, rx_buf[0]);
+                                                    }
+                                        }
+
+					mdelay(100);
+
+					pr_err("%s: LCM Driver IC is not alive, RetryReadPanelStatus = %d\n", __func__, RetryReadPanelStatus);
+
+					RetryReadPanelStatus++;
+				}
+				while (RetryReadPanelStatus < 3);
+
+				if (RetryReadPanelStatus >= 3)
+				{
+					pr_err("%s: RetryReadPanelStatus >= 3, LCM Driver IC is not alive\n", __func__);
+					kfree(rx_buf);
+					goto power_status_not_0a_fail;
+				}
+
+				kfree(rx_buf);
+			}
+			//SW4-HL-Display-ShowLCMAndBacklightStatus-00+}_20160304
+		}
+	}
+	//SW4-JasonSH-Display-EnhanceErrorHandling-00*}_20170518
+#else
 	if (on_cmds->cmd_cnt)
 		mdss_dsi_panel_cmds_send(ctrl, on_cmds, CMD_REQ_COMMIT);
+#endif
 
 	if (pinfo->compression_mode == COMPRESSION_DSC)
 		mdss_dsi_panel_dsc_pps_send(ctrl, pinfo);
@@ -969,7 +2065,18 @@ static int mdss_dsi_panel_on(struct mdss_panel_data *pdata)
 
 end:
 	pr_debug("%s:-\n", __func__);
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	return 0;
+cmds_fail:
+	return res;
+//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+power_status_not_08_fail:
+	return res;
+power_status_not_0a_fail:
+	return res;
+#else
 	return ret;
+#endif
 }
 
 static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
@@ -996,7 +2103,15 @@ static int mdss_dsi_post_panel_on(struct mdss_panel_data *pdata)
 	cmds = &ctrl->post_panel_on_cmds;
 	if (cmds->cmd_cnt) {
 		msleep(VSYNC_DELAY);	/* wait for a vsync passed */
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS) && defined(CONFIG_PXLW_IRIS3)
+		if (iris_abyp_lightup_get() == 0) {
+			iris_send_cmd_to_panel(ctrl, cmds);
+		} else {
+			mdss_dsi_panel_cmds_send(ctrl, cmds, CMD_REQ_COMMIT);
+		}
+#else
 		mdss_dsi_panel_cmds_send(ctrl, cmds, CMD_REQ_COMMIT);
+#endif
 	}
 
 	if (pinfo->is_dba_panel && pinfo->is_pluggable) {
@@ -1015,6 +2130,10 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 {
 	struct mdss_dsi_ctrl_pdata *ctrl = NULL;
 	struct mdss_panel_info *pinfo;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	int len = 1;		//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+	int res = -EPERM;	//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+#endif
 
 	if (pdata == NULL) {
 		pr_err("%s: Invalid input data\n", __func__);
@@ -1032,9 +2151,54 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 			goto end;
 	}
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#if defined(CONFIG_PXLW_IRIS3) && !defined(IRIS3_ABYP_LIGHTUP)
+	if (iris_is_valid_cfg())
+		iris_lightoff(ctrl, &ctrl->off_cmds);
+	else if (ctrl->off_cmds.cmd_cnt)
+#else
 	if (ctrl->off_cmds.cmd_cnt)
-		mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds, CMD_REQ_COMMIT);
+#endif
+	{
+		//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-01+{_20170809
+		if (BistMode)
+		{
+			//Disable bist mode after backlight is turned off
+			if (ctrl->bist_mode_off_cmds.cmd_cnt)
+			{
+				mdss_dsi_panel_cmds_send(ctrl, &ctrl->bist_mode_off_cmds, CMD_REQ_COMMIT);
+				BistMode = 0;
+			}
+		}
+		//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-01+}_20170809
 
+		DispOff = 1;	//SW4-HL-Display-NT35597-Fix_JGR-5432-AvoidCabcOffCmdIsSentDuring0x28And0x11Cmd-00+_20160601
+
+		//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+		len = mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds, CMD_REQ_COMMIT);
+		if (!len)
+		{
+			goto cmds_fail;
+		}
+		//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+	}
+#else
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#if defined(CONFIG_PXLW_IRIS3) && !defined(IRIS3_ABYP_LIGHTUP)
+/*modify by pixelworks for disable px8418 when panel off 20190621 begin*/
+	if (iris_is_valid_cfg() && iris_abyp_lightup_get() == 0)
+	{
+		iris_lightoff_pre();
+/*modify by pixelworks for disable px8418 when panel off 20190621 end*/
+		iris_lightoff(ctrl, &ctrl->off_cmds);
+	}
+	else if (ctrl->off_cmds.cmd_cnt)
+#else
+	if (ctrl->off_cmds.cmd_cnt)
+#endif // defined(CONFIG_PXLW_IRIS3) && !defined(IRIS3_ABYP_LIGHTUP)
+#endif // defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	mdss_dsi_panel_cmds_send(ctrl, &ctrl->off_cmds, CMD_REQ_COMMIT);
+#endif
 	if (ctrl->ds_registered && pinfo->is_pluggable) {
 		mdss_dba_utils_video_off(pinfo->dba_data);
 		mdss_dba_utils_hdcp_enable(pinfo->dba_data, false);
@@ -1043,6 +2207,12 @@ static int mdss_dsi_panel_off(struct mdss_panel_data *pdata)
 end:
 	pr_debug("%s:-\n", __func__);
 	return 0;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+cmds_fail:
+	return res;
+//SW4-JasonSH-Display-EnhanceErrorHandling-00*_20170518
+#endif
 }
 
 static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
@@ -1066,6 +2236,7 @@ static int mdss_dsi_panel_low_power_config(struct mdss_panel_data *pdata,
 	/* Any panel specific low power commands/config */
 
 	pr_debug("%s:-\n", __func__);
+
 	return 0;
 }
 
@@ -1129,7 +2300,6 @@ static void mdss_dsi_parse_trigger(struct device_node *np, char *trigger,
 			*trigger = DSI_CMD_TRIGGER_SW_TE;
 	}
 }
-
 
 static int mdss_dsi_parse_dcs_cmds(struct device_node *np,
 		struct dsi_panel_cmds *pcmds, char *cmd_key, char *link_key)
@@ -1809,6 +2979,16 @@ static bool mdss_dsi_cmp_panel_reg_v2(struct mdss_dsi_ctrl_pdata *ctrl)
 
 	lenp = ctrl->status_valid_params ?: ctrl->status_cmds_rlen;
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#if defined(CONFIG_TOUCHSCREEN_FTS)
+    if (lcd_need_reset)
+    {
+        pr_info( "%s: snow lcd_need_reset is ture", __func__);
+        lcd_need_reset = 0;
+        return false;
+    }
+#endif
+#endif
 	for (i = 0; i < ctrl->status_cmds.cmd_cnt; i++)
 		len += lenp[i];
 
@@ -1829,6 +3009,9 @@ static bool mdss_dsi_cmp_panel_reg_v2(struct mdss_dsi_ctrl_pdata *ctrl)
 		group += len;
 	}
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	ctrl->esd_need_reset = true;
+#endif
 	return false;
 }
 
@@ -2062,14 +3245,24 @@ static void mdss_dsi_parse_esd_params(struct device_node *np,
 				pr_err("TE-ESD not valid for video mode\n");
 				goto error;
 			}
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		}
+                else if (!strcmp(string, "tp_check")) {
+			ctrl->status_mode = ESD_TP;
+#endif
 		} else {
 			pr_err("No valid panel-status-check-mode string\n");
 			goto error;
 		}
 	}
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+        if ((ctrl->status_mode == ESD_BTA) || (ctrl->status_mode == ESD_TE) ||
+			(ctrl->status_mode == ESD_MAX)|| (ctrl->status_mode == ESD_TP))
+#else
 	if ((ctrl->status_mode == ESD_BTA) || (ctrl->status_mode == ESD_TE) ||
 			(ctrl->status_mode == ESD_MAX))
+#endif
 		return;
 
 	mdss_dsi_parse_dcs_cmds(np, &ctrl->status_cmds,
@@ -2412,6 +3605,7 @@ int mdss_panel_parse_bl_settings(struct device_node *np,
 	int rc = 0;
 	u32 tmp;
 
+
 	ctrl_pdata->bklt_ctrl = UNKNOWN_CTRL;
 	data = of_get_property(np, "qcom,mdss-dsi-bl-pmic-control-type", NULL);
 	if (data) {
@@ -2427,6 +3621,9 @@ int mdss_panel_parse_bl_settings(struct device_node *np,
 			pr_debug("%s: SUCCESS-> WLED TRIGGER register\n",
 				__func__);
 			ctrl_pdata->bklt_ctrl = BL_WLED;
+#if defined(CONFIG_PXLW_IRIS3)
+			iris_set_bklt_ctrl(bl_led_trigger);
+#endif
 		} else if (!strcmp(data, "bl_ctrl_pwm")) {
 			ctrl_pdata->bklt_ctrl = BL_PWM;
 			ctrl_pdata->pwm_pmi = of_property_read_bool(np,
@@ -2529,6 +3726,10 @@ void mdss_dsi_unregister_bl_settings(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
 {
 	if (ctrl_pdata->bklt_ctrl == BL_WLED)
 		led_trigger_unregister_simple(bl_led_trigger);
+#if defined(CONFIG_PXLW_IRIS3)
+	if (ctrl_pdata->bklt_ctrl == BL_WLED)
+		iris_set_bklt_ctrl(NULL);
+#endif
 }
 #endif
 static int mdss_dsi_panel_timing_from_dt(struct device_node *np,
@@ -2778,8 +3979,31 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	const char *bridge_chip_name;
 	struct mdss_panel_info *pinfo = &(ctrl_pdata->panel_data.panel_info);
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	//SW4-HL-Display-ImplementPanelID-00+{_20151112
+	rc = of_property_read_u32(np, "fih,panel-id", &tmp);
+	if (rc) {
+		pr_err("%s:%d, panel id not specified\n",
+						__func__, __LINE__);
+		//return -EINVAL;
+	}
+	else
+	{
+		pr_debug("\n\n******************** [HL] %s of_property_read_u32(np, \"fih,panel-id\", &tmp), tmp = %d **********************\n\n", __func__, tmp);
+	}
+	pinfo->panel_id = (!rc ? tmp : 0);
+	//SW4-HL-Display-ImplementPanelID-00+}_20151112
+
+#endif
+
 	if (mdss_dsi_is_hw_config_split(ctrl_pdata->shared_data))
 		pinfo->is_split_display = true;
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+        rc = of_property_read_u32(np,"qcom,mdss-dsi-panel-hwid", &tmp);
+	pinfo->panel_hwid = (!rc ? tmp : 0);
+        panel_hardware_id = pinfo->panel_hwid;
+#endif
 
 	rc = of_property_read_u32(np,
 		"qcom,mdss-pan-physical-width-dimension", &tmp);
@@ -2787,6 +4011,17 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	rc = of_property_read_u32(np,
 		"qcom,mdss-pan-physical-height-dimension", &tmp);
 	pinfo->physical_height = (!rc ? tmp : 0);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	//SW4-HL-Display-CTS_Xdpi_Ydpi-00+{_20151112
+	rc = of_property_read_u32(np,
+		"qcom,mdss-pan-physical-width-dimension-full", &tmp);
+	pinfo->physical_width_full = (!rc ? tmp : 0);
+	rc = of_property_read_u32(np,
+		"qcom,mdss-pan-physical-height-dimension-full", &tmp);
+	pinfo->physical_height_full = (!rc ? tmp : 0);
+	//SW4-HL-Display-CTS_Xdpi_Ydpi-00+}_20151112
+#endif
 
 	rc = of_property_read_u32(np, "qcom,mdss-dsi-bpp", &tmp);
 	if (rc) {
@@ -2980,6 +4215,11 @@ static int mdss_panel_parse_dt(struct device_node *np,
 	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->off_cmds,
 		"qcom,mdss-dsi-off-command", "qcom,mdss-dsi-off-command-state");
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+        mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->read_128bytes_cmds,
+		"qcom,mdss-dsi-read-128bytes-command", "qcom,mdss-dsi-read-128bytes-command-state");
+#endif
+
 	rc = of_property_read_u32(np, "qcom,adjust-timer-wakeup-ms", &tmp);
 	pinfo->adjust_timer_delay_ms = (!rc ? tmp : 0);
 
@@ -3014,12 +4254,50 @@ static int mdss_panel_parse_dt(struct device_node *np,
 			MSM_DBA_CHIP_NAME_MAX_LEN);
 	}
 
+#if defined(CONFIG_PXLW_IRIS3)
+	iris_parse_params(np, ctrl_pdata, mdss_dsi_parse_dcs_cmds);
+#endif
 	rc = of_property_read_u32(np,
 		"qcom,mdss-dsi-host-esc-clk-freq-hz",
 		&pinfo->esc_clk_rate_hz);
 	if (rc)
 		pinfo->esc_clk_rate_hz = MDSS_DSI_MAX_ESC_CLK_RATE_HZ;
 	pr_debug("%s: esc clk %d\n", __func__, pinfo->esc_clk_rate_hz);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	//SW4-HL-Display-ShowLCMAndBacklightStatus-00+_20160304
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->switch_cmdpage_cmds,
+		"fih,mdss-dsi-switch-cmdpage-command", "fih,mdss-dsi-switch-cmdpage-command-state");
+
+	//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-00+{_20170614
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->bist_mode_black_pattern_cmds,
+		"fih,bist-mode-black-pattern-command", "fih,bist-mode-black-pattern-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->bist_mode_off_cmds,
+		"fih,bist-mode-off-command", "fih,bist-mode-off-command-state");
+	//SW4-HL-Display-FixRedScreenWhileShutdownBacklighLed-00+}_20170614
+
+	//SW4-HL-Display-C1NO-3148-00+{_20180508
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_04h_cmds,
+		"fih,mipi-termination-resistor-04h-command", "fih,mipi-termination-resistor-04h-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_14h_cmds,
+		"fih,mipi-termination-resistor-14h-command", "fih,mipi-termination-resistor-14h-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_24h_cmds,
+		"fih,mipi-termination-resistor-24h-command", "fih,mipi-termination-resistor-24h-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_34h_cmds,
+		"fih,mipi-termination-resistor-34h-command", "fih,mipi-termination-resistor-34h-command-state");
+	//SW4-HL-Display-C1NO-3148-00+}_20180508
+
+	//SW4-HL-Display-C1NO-3148-00+{_20180508
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_04h_cmds,
+		"fih,mipi-termination-resistor-04h-command", "fih,mipi-termination-resistor-04h-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_14h_cmds,
+		"fih,mipi-termination-resistor-14h-command", "fih,mipi-termination-resistor-14h-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_24h_cmds,
+		"fih,mipi-termination-resistor-24h-command", "fih,mipi-termination-resistor-24h-command-state");
+	mdss_dsi_parse_dcs_cmds(np, &ctrl_pdata->mipi_term_resistor_34h_cmds,
+		"fih,mipi-termination-resistor-34h-command", "fih,mipi-termination-resistor-34h-command-state");
+	//SW4-HL-Display-C1NO-3148-00+}_20180508
+#endif
 
 	mdss_livedisplay_parse_dt(np, pinfo);
 
@@ -3028,6 +4306,100 @@ static int mdss_panel_parse_dt(struct device_node *np,
 error:
 	return -EINVAL;
 }
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+static ssize_t msm_fb_lcd_name(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	ssize_t ret = 0;
+	sprintf(buf, "%s\n", g_lcd_id);
+	ret = strlen(buf) + 1;
+	return ret;
+}
+
+static DEVICE_ATTR(lcd_name,0664,msm_fb_lcd_name,NULL);
+static struct kobject *msm_lcd_name;
+static int msm_lcd_name_create_sysfs(void){
+   int ret;
+   msm_lcd_name=kobject_create_and_add("android_lcd",NULL);
+   if(msm_lcd_name==NULL){
+     pr_info("msm_lcd_name_create_sysfs_ failed\n");
+     ret=-ENOMEM;
+     return ret;
+   }
+   ret=sysfs_create_file(msm_lcd_name,&dev_attr_lcd_name.attr);
+   if(ret){
+    pr_info("%s failed \n",__func__);
+    kobject_del(msm_lcd_name);
+   }
+   return 0;
+}
+/*modify by shenwenbin for M690 display panel name 20190319 end*/
+/*add by shenwenbin for panel calibrate  20190322 begin*/
+static ssize_t panel_proc_calibrate_state_read(struct file *file, char __user *buf, size_t size, loff_t *ppos)
+{
+	int cnt=0;
+	char buff[12] = {0};
+	cnt=sprintf(buff,"%d\n",calibrate_state);
+	cnt += sprintf(buff + cnt, "\n");
+	if(copy_to_user(buf, buff,sizeof(buff)))
+		pr_err("%s %d copy_to_user \n",__func__,__LINE__);
+	//printk("%s,%d,calibrate_state =%d\n",__func__,__LINE__,calibrate_state);
+	return cnt;
+
+}
+
+static ssize_t panel_proc_calibrate_state_write(struct file *file, const char *buff,size_t len, loff_t *pos)
+{
+	char buf[12] = {0};
+	if(len > 12)
+		len =12;
+	if(copy_from_user(buf, buff, len))
+		pr_err("%s %d copy_from_user \n",__func__,__LINE__);
+	if(buf[0]=='0'||buf[0]==0)
+		calibrate_state = 0;
+        else if(buf[0]=='1'||buf[0]==1)
+		calibrate_state = 1;
+        else if(buf[0]=='2'||buf[0]==2)
+		calibrate_state = 2;
+        else
+                calibrate_state = 4;
+
+	//printk("%s,%d,calibrate_state=%d\n",__func__,__LINE__,calibrate_state);
+	return len;
+}
+
+static const struct file_operations panel_proc_calibrate_state_fops = {
+	.read		= panel_proc_calibrate_state_read,
+	.write		= panel_proc_calibrate_state_write,
+};
+
+
+static int panel_calibrate_state_creat_proc_entry(void)
+{
+        struct proc_dir_entry *proc_entry_panel;
+
+        proc_entry_panel = proc_create_data("calibrate_state", 0666, NULL, &panel_proc_calibrate_state_fops, NULL);
+	if (IS_ERR_OR_NULL(proc_entry_panel))
+	{
+		pr_err("add /proc/calibrate_state error \n");
+	}
+
+    return 0;
+}
+
+int panel_calibrate_state_get(void)
+{
+	return calibrate_state;
+}
+
+int panel_calibrate_state_set(int state)
+{
+    calibrate_state = state;
+    printk("%s calibrate_state = %d\n",__func__,calibrate_state);
+    return 0;
+}
+#endif
 
 int mdss_dsi_panel_init(struct device_node *node,
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata,
@@ -3054,6 +4426,10 @@ int mdss_dsi_panel_init(struct device_node *node,
 		pr_info("%s: Panel Name = %s\n", __func__, panel_name);
 		strlcpy(&pinfo->panel_name[0], panel_name, MDSS_MAX_PANEL_LEN);
 	}
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	/*add for device name node */
+	strcpy(g_lcd_id,panel_name);
+#endif
 	rc = mdss_panel_parse_dt(node, ctrl_pdata);
 	if (rc) {
 		pr_err("%s:%d panel dt parse failed\n", __func__, __LINE__);
@@ -3073,6 +4449,9 @@ int mdss_dsi_panel_init(struct device_node *node,
 	ctrl_pdata->panel_data.apply_display_setting =
 			mdss_dsi_panel_apply_display_setting;
 	ctrl_pdata->switch_mode = mdss_dsi_panel_switch_mode;
-
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	msm_lcd_name_create_sysfs();
+        panel_calibrate_state_creat_proc_entry();
+#endif
 	return 0;
 }
