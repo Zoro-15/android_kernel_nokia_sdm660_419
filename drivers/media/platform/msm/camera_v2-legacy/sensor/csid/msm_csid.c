@@ -61,7 +61,12 @@
 #define FALSE  0
 
 #define MAX_LANE_COUNT 4
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#define CSID_TIMEOUT msecs_to_jiffies(800)
+#else
 #define CSID_TIMEOUT msecs_to_jiffies(100)
+#endif
 
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)

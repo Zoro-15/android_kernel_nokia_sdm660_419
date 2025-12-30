@@ -18,17 +18,43 @@
 #include "msm_cci.h"
 #include "msm_camera_dt_util.h"
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#define FTM
+#ifdef FTM
+#define CAMERA_MASK_S5K2L7 0X01
+#define CAMERA_MASK_S5K4H8 0X02
+#define CAMERA_MASK_S5K3H7 0X04
+#define CAMERA_MASK_S5K3M3 0X02
+#define CAMERA_MASK_S5K3P8 0X04
+#define CAMERA_MASK_S5KGM1SP 0x08 
+#define CAMERA_MASK_S5K5E9YU05  0x10
+#define CAMERA_MASK_OV16885   0x20
+#define CAMERA_MASK_HI846   0x40
+
+static int32_t g_camera_ping = 0;
+#endif
+#endif
+
 /* Logging macro */
 #undef CDBG
 #define CDBG(fmt, args...) pr_debug(fmt, ##args)
 
 #define SENSOR_MAX_MOUNTANGLE (360)
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+extern struct vendor_eeprom s_vendor_eeprom[CAMERA_VENDOR_EEPROM_COUNT_MAX];
+#endif
+
 static struct v4l2_file_operations msm_sensor_v4l2_subdev_fops;
 static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev);
 
 /* Static declaration */
 static struct msm_sensor_ctrl_t *g_sctrl[MAX_CAMERAS];
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+extern int fih_camera_dev_init(struct msm_camera_sensor_slave_info *slave_info);
+extern int fih_camera_bbs_init(struct msm_sensor_ctrl_t * ctrl);//add
+#endif
 
 static int msm_sensor_platform_remove(struct platform_device *pdev)
 {
@@ -721,6 +747,19 @@ static void msm_sensor_fill_sensor_info(struct msm_sensor_ctrl_t *s_ctrl,
 	strlcpy(entity_name, s_ctrl->msm_sd.sd.entity.name, MAX_SENSOR_NAME);
 }
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#ifdef FTM
+static ssize_t show_camera_ping(struct device *dev,
+					struct device_attribute *attr, char *buf)
+{
+	pr_err("%s=%d", __func__, g_camera_ping);
+	return scnprintf(buf, PAGE_SIZE, "%d\n", g_camera_ping);
+}
+static DEVICE_ATTR(cam_ping, 440, show_camera_ping, NULL);
+static const struct attribute *cam_ping_attrib = &dev_attr_cam_ping.attr;
+#endif
+#endif
+
 /* static function definition */
 static int32_t msm_sensor_driver_is_special_support(
 	struct msm_sensor_ctrl_t *s_ctrl,
@@ -741,11 +780,80 @@ static int32_t msm_sensor_driver_is_special_support(
 
 
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+static struct kobject *msm_sensor_device=NULL;
+static char module_info[256] = {0};
+
+void msm_sensor_set_module_info(struct msm_sensor_ctrl_t *s_ctrl)
+{
+        printk(" s_ctrl->sensordata->camera_type = %d\n", s_ctrl->sensordata->sensor_info->position);
+
+        switch (s_ctrl->sensordata->sensor_info->position) {
+                case BACK_CAMERA_B:
+                        strcat(module_info, "back: ");
+                        break;
+                case AUX_CAMERA_B:
+                        strcat(module_info, "back_aux: ");
+                        break;
+                case FRONT_CAMERA_B:
+                        strcat(module_info, "front: ");
+                        break;
+                case WIDE_CAMERA_B:
+                        strcat(module_info, "wide: ");
+                        break;
+                default:
+                        strcat(module_info, "unknown: ");
+                        break;
+        }
+        strcat(module_info, s_ctrl->sensordata->sensor_name);
+        strcat(module_info, "\n");
+}
+
+static ssize_t msm_sensor_module_id_show(struct device *dev,
+                struct device_attribute *attr, char *buf)
+{
+        ssize_t rc = 0;
+
+        sprintf(buf, "%s\n", module_info);
+        rc = strlen(buf) + 1;
+
+        return rc;
+}
+
+static DEVICE_ATTR(sensor, 0444, msm_sensor_module_id_show, NULL);
+
+int32_t msm_sensor_init_device_name(void)
+{
+        int32_t rc = 0;
+        CDBG("%s %d\n", __func__,__LINE__);
+        if(msm_sensor_device != NULL){
+                pr_err("Macle android_camera already created\n");
+                return 0;
+        }
+        msm_sensor_device = kobject_create_and_add("android_camera", NULL);
+        if (msm_sensor_device == NULL) {
+                printk("%s: subsystem_register failed\n", __func__);
+                rc = -ENOMEM;
+                return rc;
+        }
+        rc = sysfs_create_file(msm_sensor_device, &dev_attr_sensor.attr);
+        if (rc) {
+                printk("%s: sysfs_create_file failed\n", __func__);
+                kobject_del(msm_sensor_device);
+        }
+
+        return 0;
+}
+#endif
+
 /* static function definition */
 int32_t msm_sensor_driver_probe(void *setting,
 	struct msm_sensor_info_t *probed_info, char *entity_name)
 {
 	int32_t                              rc = 0;
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	uint8_t 				i = 0;
+#endif
 	struct msm_sensor_ctrl_t            *s_ctrl = NULL;
 	struct msm_camera_cci_client        *cci_client = NULL;
 	struct msm_camera_sensor_slave_info *slave_info = NULL;
@@ -850,6 +958,43 @@ int32_t msm_sensor_driver_probe(void *setting,
 	}
 
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	pr_err("%s lxl camera eeprom_name=%s\n",__func__, slave_info->eeprom_name);//slave_info is from userspace
+	pr_err("%s lxl slave_info->sensor_name =%s\n",__func__, slave_info->sensor_name);//slave_info is from userspace
+
+	for(i = 0; i < CAMERA_VENDOR_EEPROM_COUNT_MAX; i++) {
+	    pr_err("dtsi eeprom_name[%d]=%s, module_id=%d\n", i, s_vendor_eeprom[i].eeprom_name, s_vendor_eeprom[i].module_id);
+		if(strcmp(slave_info->eeprom_name, s_vendor_eeprom[i].eeprom_name) == 0){
+			if(((strcmp(slave_info->sensor_name, "daredevil_s5kgm1sp_back_tsp_i") == 0) &&
+				(s_vendor_eeprom[i].module_id == 13))
+			|| ((strcmp(slave_info->sensor_name, "daredevil_s5kgm1sp_back_tly_ii") == 0) &&
+				(s_vendor_eeprom[i].module_id == 2))
+			|| ((strcmp(slave_info->sensor_name, "starlord_s5k3p9sx_back_txd_i") == 0))
+			|| ((strcmp(slave_info->sensor_name, "starlord_s5k3p9sx_back_hlt_ii") == 0))
+			|| ((strcmp(slave_info->sensor_name, "daredevil_hi556_aux_tsp_i") == 0))
+			|| ((strcmp(slave_info->sensor_name, "starlord_hi556_aux_txd_i") == 0))
+			|| ((strcmp(slave_info->sensor_name, "daredevil_s5k3t1sp_front_tsp_i") == 0))
+			|| ((strcmp(slave_info->sensor_name, "daredevil_s5k3t1sp_front_tru_ii") == 0))
+			|| ((strcmp(slave_info->sensor_name, "starlord_hi846_front_txd_i") == 0))
+			|| ((strcmp(slave_info->sensor_name, "starlord_hi846_front_hlt_ii") == 0))
+			|| ((strcmp(slave_info->sensor_name, "daredevil_hi846_wide_txd_i") == 0))
+			|| ((strcmp(slave_info->sensor_name, "starlord_gc5035_aux_truly_ii") == 0))
+			|| ((strcmp(slave_info->sensor_name, "daredevil_gc8034_wide_byd_ii") == 0)
+				&& (s_vendor_eeprom[i].module_id == MID_BYD))
+			){
+				pr_err("lxl module found!probe continue!eeprom_name=%s\n", slave_info->eeprom_name);
+				break;
+			}
+		}
+	}
+	if(i >= CAMERA_VENDOR_EEPROM_COUNT_MAX) {
+		pr_err("module not found!probe break!eeprom_name=%s sensor_name=%s\n", slave_info->eeprom_name,slave_info->sensor_name);
+		rc = -EFAULT;
+
+		goto free_slave_info;
+	}
+#endif
+
 	/* Print slave info */
 	CDBG("camera id %d Slave addr 0x%X addr_type %d\n",
 		slave_info->camera_id, slave_info->slave_addr,
@@ -902,6 +1047,20 @@ int32_t msm_sensor_driver_probe(void *setting,
 		 * and probe already succeeded for that sensor. Ignore this
 		 * probe
 		 */
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		if ((slave_info->sensor_id_info.sensor_id ==
+			s_ctrl->sensordata->cam_slave_info->sensor_id_info.sensor_id) &&
+			(slave_info->slave_addr == s_ctrl->sensordata->cam_slave_info->slave_addr)) {	//SW4-RL-Camera-add more condition when probe again-00*_20170825
+			pr_err("%s, slot_%d (sensor_id: 0x%x, sensor_name = %s) already probed\n", __func__,
+				slave_info->camera_id,
+				s_ctrl->sensordata->cam_slave_info->sensor_id_info.sensor_id,
+				s_ctrl->sensordata->cam_slave_info->sensor_name);
+			msm_sensor_fill_sensor_info(s_ctrl,
+				probed_info, entity_name);
+		} else{
+			pr_err("%s, slot_%d has some other sensor\n", __func__, slave_info->camera_id);
+		}
+#else
 		if (slave_info->sensor_id_info.sensor_id ==
 			s_ctrl->sensordata->cam_slave_info->
 				sensor_id_info.sensor_id &&
@@ -917,6 +1076,7 @@ int32_t msm_sensor_driver_probe(void *setting,
 		} else
 			pr_err("slot %d has some other sensor\n",
 				slave_info->camera_id);
+#endif
 
 		rc = 0;
 		goto free_slave_info;
@@ -1047,9 +1207,48 @@ CSID_TG:
 	}
 
 	pr_err("%s probe succeeded", slave_info->sensor_name);
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	fih_camera_dev_init(slave_info);
+#endif
 
 	s_ctrl->bypass_video_node_creation =
 		slave_info->bypass_video_node_creation;
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	pr_err("%s wbl E slave_info->sensor_name = %s \n", __func__, slave_info->sensor_name);
+#ifdef FTM
+	/* Add for FIH test */
+	if(!strcmp(slave_info->sensor_name, "s5k2l7sa_s2p"))
+		g_camera_ping |= CAMERA_MASK_S5K2L7;
+	else if(!strcmp(slave_info->sensor_name, "s5k4h8_s2p"))
+		g_camera_ping |= CAMERA_MASK_S5K4H8;
+	else if(!strcmp(slave_info->sensor_name, "s5k3h7_s2p"))
+		g_camera_ping |= CAMERA_MASK_S5K3H7;
+	else if(!strcmp(slave_info->sensor_name, "s5k2l7sa_s3p"))
+		g_camera_ping |= CAMERA_MASK_S5K2L7;
+	else if(!strcmp(slave_info->sensor_name, "s5k3m3sm_s3p"))
+		g_camera_ping |= CAMERA_MASK_S5K3M3;
+	else if((!strcmp(slave_info->sensor_name, "s5k3p8sp_s3p")) || (!strcmp(slave_info->sensor_name, "s5k3p8sp_b2n")))
+		g_camera_ping |= CAMERA_MASK_S5K3P8;
+	else if(!strcmp(slave_info->sensor_name, "s5k2l7_b2n_wide"))
+		g_camera_ping |= CAMERA_MASK_S5K2L7;
+	else if(!strcmp(slave_info->sensor_name, "s5k3m3sm_b2n_tele"))
+		g_camera_ping |= CAMERA_MASK_S5K3M3;
+	/* FIH-Binn-Add for TAS FAP test -00+{ */
+	else if(!strcmp(slave_info->sensor_name, "s5kgm1sp"))
+		g_camera_ping |= CAMERA_MASK_S5KGM1SP;
+	else if(!strcmp(slave_info->sensor_name, "s5k5e9yu05"))
+		g_camera_ping |= CAMERA_MASK_S5K5E9YU05;
+	else if(!strcmp(slave_info->sensor_name, "ov16885"))
+		g_camera_ping |= CAMERA_MASK_OV16885;
+	else if(!strcmp(slave_info->sensor_name, "hi846"))
+		g_camera_ping |= CAMERA_MASK_HI846;
+	/* FIH-Binn-Add for TAS FAP test -00+}*/
+	
+	pr_err("%s wbl E slave_info->sensor_name = %s \n", __func__, slave_info->sensor_name);
+	pr_err("%s wbl E g_camera_ping = 0x%x \n", __func__, g_camera_ping);
+#endif
+#endif
 
 	/*
 	 * Create /dev/videoX node, comment for now until dummy /dev/videoX
@@ -1094,6 +1293,14 @@ CSID_TG:
 	s_ctrl->sensordata->cam_slave_info = slave_info;
 
 	msm_sensor_fill_sensor_info(s_ctrl, probed_info, entity_name);
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	msm_sensor_init_device_name();
+	msm_sensor_set_module_info(s_ctrl);
+#endif
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	fih_camera_bbs_init(s_ctrl);//add
+#endif
 
 	/*
 	 * Set probe succeeded flag to 1 so that no other camera shall
@@ -1377,6 +1584,13 @@ static int32_t msm_sensor_driver_platform_probe(struct platform_device *pdev)
 
 	/* Fill device in power info */
 	s_ctrl->sensordata->power_info.dev = &pdev->dev;
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS) && defined(FTM)
+	pr_err("platform : Register sysfs, cam_ping_attrib\n");
+	rc = sysfs_create_file(&pdev->dev.kobj, cam_ping_attrib);
+	if(rc) {
+		pr_err("Cannot register sysfs, cam_ping_attrib\n");
+	}
+#endif
 	return rc;
 FREE_S_CTRL:
 	kfree(s_ctrl);
