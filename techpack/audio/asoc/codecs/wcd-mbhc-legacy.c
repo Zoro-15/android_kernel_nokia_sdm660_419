@@ -26,6 +26,10 @@ static int det_extn_cable_en;
 module_param(det_extn_cable_en, int, 0664);
 MODULE_PARM_DESC(det_extn_cable_en, "enable/disable extn cable detect");
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+extern bool spk_ext_pa_is_on;
+#endif
+
 static bool wcd_mbhc_detect_anc_plug_type(struct wcd_mbhc *mbhc)
 {
 	bool anc_mic_found = false;
@@ -230,6 +234,16 @@ static bool wcd_is_special_headset(struct wcd_mbhc *mbhc)
 					__func__);
 			break;
 		}
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		if (mbhc->impedance_detect) {
+			mbhc->mbhc_cb->compute_impedance(mbhc,
+			&mbhc->zl, &mbhc->zr);
+			if ((mbhc->zl > 20000) && (mbhc->zr > 20000)) {
+				pr_debug("%s: Selfie stick detected\n",__func__);
+				break;
+			}
+		}
+#endif
 	}
 	if (is_spl_hs) {
 		pr_debug("%s: Headset with threshold found\n",  __func__);
@@ -461,6 +475,9 @@ static void wcd_correct_swch_plug(struct work_struct *work)
 	wcd_enable_curr_micbias(mbhc, WCD_MBHC_EN_MB);
 
 	/* Enable HW FSM */
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 0);
+#endif
 	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_FSM_EN, 1);
 	/*
 	 * Check for any button press interrupts before starting 3-sec
@@ -729,7 +746,25 @@ enable_supply:
 	if (mbhc->mbhc_cb->mbhc_micbias_control)
 		wcd_mbhc_update_fsm_source(mbhc, plug_type);
 	else
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		wcd_enable_mbhc_supply(mbhc, mbhc->current_plug);
+#elif defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		/*Add for selfie stick not work  ligang 20190624*/
+		if (mbhc->impedance_detect) {
+			mbhc->mbhc_cb->compute_impedance(mbhc,
+			&mbhc->zl, &mbhc->zr);
+				if ((mbhc->zl > 20000) && (mbhc->zr > 20000)) {
+					pr_debug("%s:Selfie stick device,need enable btn isrc ctrl",__func__);
+					wcd_enable_mbhc_supply(mbhc, MBHC_PLUG_TYPE_HEADSET);
+				} else {
+					wcd_enable_mbhc_supply(mbhc, plug_type);
+				}
+		} else {
+#endif
 		wcd_enable_mbhc_supply(mbhc, plug_type);
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		}
+#endif
 exit:
 	if (mbhc->mbhc_cb->mbhc_micbias_control &&
 	    !mbhc->micbias_enable)

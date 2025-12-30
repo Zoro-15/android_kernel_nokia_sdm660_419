@@ -27,6 +27,10 @@
 #include <asoc/sdm660-common.h>
 #include <asoc/wcd-mbhc-v2-api.h>
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#include <linux/of_gpio.h>
+#endif
+
 #define DRV_NAME "pmic_analog_codec"
 #define SDM660_CDC_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
 			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_44100 |\
@@ -52,7 +56,11 @@
 #define SPK_PMD 2
 #define SPK_PMU 3
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#define MICBIAS_DEFAULT_VAL 2700000
+#else
 #define MICBIAS_DEFAULT_VAL 1800000
+#endif
 #define MICBIAS_MIN_VAL 1600000
 #define MICBIAS_STEP_SIZE 50000
 
@@ -2225,7 +2233,12 @@ static int msm_anlg_cdc_codec_enable_adc(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		msm_anlg_cdc_codec_enable_adc_block(component, 1);
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		//rita change for tas CFILT connect setting wrong at 20181207
+		if ((w->reg == MSM89XX_PMIC_ANALOG_TX_2_EN) && (strstr(saved_command_line, "androidboot.device=TAS") == NULL))
+#else
 		if (w->reg == MSM89XX_PMIC_ANALOG_TX_2_EN)
+#endif
 			snd_soc_component_update_bits(component,
 			MSM89XX_PMIC_ANALOG_MICB_1_CTL, 0x02, 0x02);
 		/*
