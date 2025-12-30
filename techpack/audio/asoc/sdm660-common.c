@@ -17,7 +17,13 @@
 #include <asoc/sdm660-external.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include "codecs/sdm660_cdc/msm-analog-cdc.h"
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#include <linux/proc_fs.h>
+#endif
+
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 #include "codecs/wsa881x.h"
+#endif
 
 #define __CHIPSET__ "SDM660 "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
@@ -30,6 +36,9 @@
 #define DEV_NAME_STR_LEN  32
 #define DEFAULT_MCLK_RATE 9600000
 #define MSM_LL_QOS_VALUE 300 /* time in us to ensure LPM doesn't go in C3/C4 */
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+bool ext_spk_amp_support;
+#endif
 
 enum {
 	DP_RX_IDX,
@@ -216,31 +225,47 @@ static u32 mi2s_ebit_clk[MI2S_MAX] = {
 	Q6AFE_LPASS_CLK_ID_QUI_MI2S_EBIT
 };
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 struct msm_wsa881x_dev_info {
 	struct device_node *of_node;
 	u32 index;
 };
 static struct snd_soc_aux_dev *msm_aux_dev;
 static struct snd_soc_codec_conf *msm_codec_conf;
+#endif
 
 static bool msm_swap_gnd_mic(struct snd_soc_component *component, bool active);
 
 static struct wcd_mbhc_config mbhc_cfg = {
 	.read_fw_bin = false,
 	.calibration = NULL,
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	.detect_extn_cable = false,
+#else
 	.detect_extn_cable = true,
+#endif
 	.mono_stero_detection = false,
 	.swap_gnd_mic = NULL,
 	.hs_ext_micbias = true,
 	.key_code[0] = KEY_MEDIA,
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS) || defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	.key_code[1] = KEY_VOLUMEUP,
+	.key_code[2] = KEY_VOLUMEDOWN,
+	.key_code[3] = 0,
+#else
 	.key_code[1] = KEY_VOICECOMMAND,
 	.key_code[2] = KEY_VOLUMEUP,
 	.key_code[3] = KEY_VOLUMEDOWN,
+#endif
 	.key_code[4] = 0,
 	.key_code[5] = 0,
 	.key_code[6] = 0,
 	.key_code[7] = 0,
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	.linein_th = 27000,
+#else
 	.linein_th = 5000,
+#endif
 	.moisture_en = false,
 	.mbhc_micbias = 0,
 	.anc_micbias = 0,
@@ -257,7 +282,11 @@ static struct dev_config proxy_rx_cfg = {
 static struct dev_config mi2s_rx_cfg[] = {
 	[PRIM_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	[SEC_MI2S]  = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 1},
+#else
 	[TERT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
+#endif
 	[QUAT_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 	[QUIN_MI2S] = {SAMPLING_RATE_48KHZ, SNDRV_PCM_FORMAT_S16_LE, 2},
 };
@@ -4682,9 +4711,16 @@ int msm_mi2s_snd_startup(struct snd_pcm_substream *substream)
 				goto clk_off;
 			}
 		}
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		if ((index == TERT_MI2S) && (pdata->tert_mi2s_gpio_p)) {
+			msm_cdc_pinctrl_select_active_state(pdata->tert_mi2s_gpio_p);
+			pr_debug("%s: active Tertiary MI2S gpios\n", __func__);
+		}
+#else
 		if (pdata->mi2s_gpio_p[index])
 			msm_cdc_pinctrl_select_active_state(
 					pdata->mi2s_gpio_p[index]);
+#endif
 	}
 	mutex_unlock(&mi2s_intf_conf[index].lock);
 	return 0;
@@ -4723,9 +4759,16 @@ void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 
 	mutex_lock(&mi2s_intf_conf[index].lock);
 	if (--mi2s_intf_conf[index].ref_cnt == 0) {
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		if ((index == TERT_MI2S) && (pdata->tert_mi2s_gpio_p)) {
+			msm_cdc_pinctrl_select_sleep_state(pdata->tert_mi2s_gpio_p);
+			pr_debug("%s: sleep Tertiary MI2S gpios\n", __func__);
+		}
+#else
 		if (pdata->mi2s_gpio_p[index])
 			msm_cdc_pinctrl_select_sleep_state(
 					pdata->mi2s_gpio_p[index]);
+#endif
 
 		ret = msm_mi2s_set_sclk(substream, false);
 		if (ret < 0)
@@ -4747,6 +4790,42 @@ void msm_mi2s_snd_shutdown(struct snd_pcm_substream *substream)
 	mutex_unlock(&mi2s_intf_conf[index].lock);
 }
 EXPORT_SYMBOL(msm_mi2s_snd_shutdown);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+static int fih_ext_spk_amp_read_show(struct seq_file *m, void *v)
+{
+	if(ext_spk_amp_support)
+		seq_printf(m, "Support\n");
+	else
+		seq_printf(m, "Not Support\n");
+	return 0;
+}
+
+static int fih_ext_spk_amp_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, fih_ext_spk_amp_read_show, NULL);
+}
+
+static struct file_operations ext_spk_amp_file_ops = {
+	.owner   = THIS_MODULE,
+	.open    = fih_ext_spk_amp_proc_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = single_release
+};
+
+static int fih_ext_spk_amp_init(void)
+{
+	if (proc_create("AllHWList/ExtSpkAmp", 0, NULL, &ext_spk_amp_file_ops) == NULL) {
+		proc_mkdir("AllHWList", NULL);
+		if (proc_create("AllHWList/ExtSpkAmp", 0, NULL, &ext_spk_amp_file_ops) == NULL) {
+			pr_err("%s: fail to create proc/%s\n", __func__, "AllHWList/ExtSpkAmp");
+			return 1;
+		}
+	}
+	return 0;
+}
+#endif
 
 static int msm_get_tdm_mode(u32 port_id)
 {
@@ -5085,6 +5164,7 @@ err:
 	return ret;
 }
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 static int msm_wsa881x_init(struct snd_soc_component *component)
 {
 	u8 spkleft_ports[WSA881X_MAX_SWR_PORTS] = {100, 101, 102, 106};
@@ -5319,6 +5399,7 @@ err_mem:
 err_dt:
 	return ret;
 }
+#endif
 
 static void i2s_auxpcm_init(struct platform_device *pdev)
 {
@@ -5437,6 +5518,18 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 					"qcom,cdc-ext-spk-gpios", 0);
 	}
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	/* read Tertiary MI2S gpio configurations from dtsi file */
+	pdata->tert_mi2s_gpio_p = of_parse_phandle(pdev->dev.of_node,
+				"qcom,tert-mi2s-gpios", 0);
+	if (!pdata->tert_mi2s_gpio_p) {
+		dev_dbg(&pdev->dev, "property %s not detected in node %s",
+			"qcom,tert-mi2s-gpios", pdev->dev.of_node->full_name);
+	} else {
+		dev_dbg(&pdev->dev, "%s detected", "qcom,tert-mi2s-gpios");
+	}
+#endif
+
 	pdata->mi2s_gpio_p[PRIM_MI2S] = of_parse_phandle(pdev->dev.of_node,
 					"qcom,pri-mi2s-gpios", 0);
 	pdata->mi2s_gpio_p[SEC_MI2S] = of_parse_phandle(pdev->dev.of_node,
@@ -5485,11 +5578,13 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+#if !defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 	if (!of_property_read_bool(pdev->dev.of_node, "qcom,wsa-disable")) {
 		ret = msm_init_wsa_dev(pdev, card);
 		if (ret)
 			goto err;
 	}
+#endif
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
@@ -5509,6 +5604,11 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	}
 	if (pdata->snd_card_val != INT_SND_CARD)
 		msm_ext_register_audio_notifier(pdev);
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	ext_spk_amp_support = of_property_read_bool(pdev->dev.of_node, "fih,ext-spk-amp-support");
+	fih_ext_spk_amp_init();
+#endif
 
 	return 0;
 err:
