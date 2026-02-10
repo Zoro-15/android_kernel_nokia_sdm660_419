@@ -27,13 +27,13 @@
 ** =============================================================================
 */
 
-#include <linux/switch.h>
+#include <linux/extcon.h>
+#include <../../drivers/extcon/extcon.h>
 #include <linux/regmap.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
-#include <../../../drivers/staging/android/timed_output.h>
+#include <../../drivers/staging/android/timed_output.h>
 #include <linux/hrtimer.h>
-#include <linux/wakelock.h>
 #include <linux/mutex.h>
 #include <linux/cdev.h>
 #ifdef CONFIG_HAS_EARLYSUSPEND
@@ -460,7 +460,7 @@ struct drv2605L_data {
 	dev_t version;
 	struct semaphore sem;
 	struct cdev cdev;
-	struct switch_dev sw_dev;
+	struct extcon_dev sw_dev;
 	volatile int audio_haptics_enabled;
 	volatile int vibrator_is_playing;
 	char ReadBuff[MAX_READ_BYTES];
@@ -476,7 +476,7 @@ struct drv2605L_data {
 	
 	int OTP;
 	
-    struct wake_lock wklock;
+    struct wakeup_source *wklock;
     struct hrtimer timer;
     struct mutex lock;
     struct work_struct vibrator_work;
