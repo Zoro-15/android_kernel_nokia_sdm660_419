@@ -128,7 +128,12 @@ struct iris_cfg {
 	struct mutex mutex;
 	uint8_t name[MDSS_MAX_PANEL_LEN];
 	struct mdss_dsi_ctrl_pdata *ctrl;
+
+#ifndef CONFIG_BACKLIGHT_QCOM_SPMI_WLED
 	struct led_trigger *bl_led;
+#else
+	struct backlight_device *bl_ctrl;
+#endif
 	struct dentry *dbg_root;
 	struct iris_ip_index  ip_index_arr[IRIS_IP_CNT];
 	struct dsi_panel_cmds  cmds;

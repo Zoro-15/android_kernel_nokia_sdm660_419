@@ -3622,7 +3622,11 @@ int mdss_panel_parse_bl_settings(struct device_node *np,
 				__func__);
 			ctrl_pdata->bklt_ctrl = BL_WLED;
 #if defined(CONFIG_PXLW_IRIS3)
+#ifndef CONFIG_BACKLIGHT_QCOM_SPMI_WLED
 			iris_set_bklt_ctrl(bl_led_trigger);
+#else
+			iris_set_bklt_ctrl(ctrl_pdata);
+#endif
 #endif
 		} else if (!strcmp(data, "bl_ctrl_pwm")) {
 			ctrl_pdata->bklt_ctrl = BL_PWM;

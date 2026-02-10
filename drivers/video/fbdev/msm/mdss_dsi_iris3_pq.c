@@ -709,12 +709,12 @@ void iris_cm_color_temp_set(void)
 #endif
 
 	/*if(pqlt_cur_setting->pq_setting.cmcolorgamut == 0) {*/
-		iris_init_ipopt_ip(popt,  IP_OPT_MAX);
-		len = iris_capture_disable_pq(popt, &skiplast);
-		len = iris_cm_ratio_set(popt, skiplast);
+	iris_init_ipopt_ip(popt,  IP_OPT_MAX);
+	len = iris_capture_disable_pq(popt, &skiplast);
+	len = iris_cm_ratio_set(popt, skiplast);
 
-		len = iris_capture_enable_pq(popt, len);
-		iris_update_pq_opt(popt, len);
+	len = iris_capture_enable_pq(popt, len);
+	iris_update_pq_opt(popt, len);
 	/*}*/
 	pr_info("%s, len = %d\n",  __func__, len);
 }
@@ -1655,8 +1655,13 @@ void iris_panel_nits_set(u32 bl_ratio, bool bSystemRestore, int level)
 
 	switch (pcfg->ctrl->bklt_ctrl) {
 	case BL_WLED:
+#ifndef CONFIG_BACKLIGHT_QCOM_SPMI_WLED
 		if (pcfg->bl_led)
 			led_trigger_event(pcfg->bl_led, bl_level);
+#else
+		if (pcfg->bl_ctrl)
+			backlight_device_set_brightness(pcfg->bl_ctrl, bl_level);
+#endif
 		break;
 	case BL_DCS_CMD:
 		memset(&cmdreq, 0, sizeof(cmdreq));
