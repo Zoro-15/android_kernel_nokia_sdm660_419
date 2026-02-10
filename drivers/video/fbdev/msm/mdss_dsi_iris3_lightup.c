@@ -3150,11 +3150,19 @@ void iris_set_cont_splash(bool enable)
 	pcfg->cont_splash_enabled = enable;
 }
 
+#ifndef CONFIG_BACKLIGHT_QCOM_SPMI_WLED
 void iris_set_bklt_ctrl(struct led_trigger *bl_led)
 {
 	struct iris_cfg *pcfg = iris_get_cfg();
 	pcfg->bl_led = bl_led;
 }
+#else
+void iris_set_bklt_ctrl(struct mdss_dsi_ctrl_pdata *ctrl_pdata)
+{
+	struct iris_cfg *pcfg = iris_get_cfg();
+	pcfg->bl_ctrl = ctrl_pdata->raw_bd;
+}
+#endif
 
 void iris_display_prepare(void)
 {

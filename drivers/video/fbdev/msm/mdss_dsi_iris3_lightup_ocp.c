@@ -10,7 +10,6 @@
 #include <linux/msm_mdp.h>
 #include <linux/memblock.h>
 #include <linux/sort.h>
-#include <linux/sw_sync.h>
 #include <linux/kmemleak.h>
 
 #include <soc/qcom/event_timer.h>

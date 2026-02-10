@@ -293,7 +293,11 @@ struct msmfb_iris_ambient_info *iris_get_ambient_lut(void);
 
 void iris_set_cont_splash(bool enable);
 
+#ifndef CONFIG_BACKLIGHT_QCOM_SPMI_WLED
 void iris_set_bklt_ctrl(struct led_trigger *bl_led);
+#else
+void iris_set_bklt_ctrl(struct mdss_dsi_ctrl_pdata *ctrl_pdata);
+#endif
 
 void iris_display_prepare(void);
 
