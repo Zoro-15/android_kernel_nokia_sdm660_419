@@ -29,11 +29,6 @@
 			< 775000000 7>;  /* TURBO  */
 };
 
-
-&pm660_coincell {
-			qcom,charge-enable = <0>;
-};
-
 &rpm_bus {
 	//SW4-HL-Display-BringUpILI7807E-00+{_20170327
 	rpm-regulator-ldoa18 {
