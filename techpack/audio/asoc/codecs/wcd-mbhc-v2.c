@@ -30,33 +30,16 @@
 #if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
 #define LEGACY_SWITCH_DEV_SUPPORT
 #ifdef LEGACY_SWITCH_DEV_SUPPORT
-#include <linux/switch.h>
+#include <linux/extcon.h>
+#include <../../../../drivers/extcon/extcon.h>
 #include <asm/atomic.h>
 
 struct h2w_info {
-	struct switch_dev sdev;
+	struct extcon_dev sdev;
 	atomic_t btn_state;
 	atomic_t hs_state;
 };
 static struct h2w_info *fih_hs;
-
-static ssize_t trout_h2w_print_name(struct switch_dev *sdev, char *buf)
-{
-       int state = 0;
-       state = switch_get_state(&fih_hs->sdev);
-
-	switch (state)
-	{
-		case MBHC_PLUG_TYPE_NONE:
-			return sprintf(buf, "No Device\n");
-		case MBHC_PLUG_TYPE_HEADSET:
-			return sprintf(buf, "Headset\n");
-		case MBHC_PLUG_TYPE_HEADPHONE:
-			return sprintf(buf, "Headphone\n");
-	}
-
-	return -EINVAL;
-}
 
 static ssize_t show_btn_state(struct device *dev,struct device_attribute *attr, char *buf)
 {
@@ -68,9 +51,8 @@ static DEVICE_ATTR(btn_state, S_IRUGO, show_btn_state, NULL);
 #endif
 #endif
 
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
-static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
-			enum wcd_mbhc_plug_type plug_type);
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+extern bool spk_ext_pa_is_on;
 #endif
 
 void wcd_mbhc_jack_report(struct wcd_mbhc *mbhc,
@@ -802,8 +784,8 @@ void wcd_mbhc_report_plug(struct wcd_mbhc *mbhc, int insertion,
 #ifdef LEGACY_SWITCH_DEV_SUPPORT
 		if(!mbhc->mbhc_cfg->fih_hs_support && fih_hs)
 		{
-			switch_set_state(&fih_hs->sdev, mbhc->current_plug);
-			pr_info("%s: switch_set_state %d\n", __func__, mbhc->current_plug);
+			extcon_set_state(&fih_hs->sdev, EXTCON_JACK_HEADPHONE, mbhc->current_plug);
+			pr_info("%s: extcon_set_state %d\n", __func__, mbhc->current_plug);
 		}
 #endif
 #endif
@@ -903,7 +885,7 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 					pr_debug("%s: special accessory \n", __func__);
 					/* Toggle switch back */
 					if (mbhc->mbhc_cfg->swap_gnd_mic &&
-						mbhc->mbhc_cfg->swap_gnd_mic(mbhc->codec)) {
+						mbhc->mbhc_cfg->swap_gnd_mic(mbhc->component, true)) {
 						pr_debug("%s: US_EU gpio present,flip switch again\n" , __func__);
 					}
 					/* enable CS/MICBIAS for headset button detection to work */
@@ -927,7 +909,7 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 				printk("lct 0; special accessory\n");
 				/* Toggle switch back */
 				if (mbhc->mbhc_cfg->swap_gnd_mic &&
-					mbhc->mbhc_cfg->swap_gnd_mic(mbhc->codec)) {
+					mbhc->mbhc_cfg->swap_gnd_mic(mbhc->component, true)) {
 						pr_debug("%s: US_EU gpio present,flip switch again\n"
 						, __func__);
 					    printk("lct 0; US_EU gpio present,flip switch again\n");
@@ -940,7 +922,6 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 				wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
 			}
 		}
-#else
 #else
 		wcd_mbhc_report_plug(mbhc, 1, SND_JACK_UNSUPPORTED);
 #endif
@@ -968,7 +949,7 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 					pr_debug("tsx_hph_%s: special accessory \n", __func__);
 					/* Toggle switch back */
 					if (mbhc->mbhc_cfg->swap_gnd_mic &&
-					mbhc->mbhc_cfg->swap_gnd_mic(mbhc->codec)) {
+					mbhc->mbhc_cfg->swap_gnd_mic(mbhc->component, true)) {
 					pr_debug("%s: US_EU gpio present,flip switch again\n"
 					, __func__);
 					}
@@ -1015,7 +996,7 @@ void wcd_mbhc_find_plug_and_report(struct wcd_mbhc *mbhc,
 					pr_debug("%s: special accessory \n", __func__);
 					/* Toggle switch back */
 					if (mbhc->mbhc_cfg->swap_gnd_mic &&
-						mbhc->mbhc_cfg->swap_gnd_mic(mbhc->codec)) {
+						mbhc->mbhc_cfg->swap_gnd_mic(mbhc->component, true)) {
 						pr_debug("%s: US_EU gpio present,flip switch again\n" , __func__);
 					}
 
@@ -2155,19 +2136,18 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 			atomic_set(&fih_hs->btn_state, 0);
 			atomic_set(&fih_hs->hs_state, 0);
 			fih_hs->sdev.name = "h2w";
-			fih_hs->sdev.print_name = trout_h2w_print_name;
-			ret = switch_dev_register(&fih_hs->sdev);
+			ret = extcon_dev_register(&fih_hs->sdev);
 			if (!ret){
-				ret = device_create_file(fih_hs->sdev.dev,&dev_attr_btn_state);
+				ret = device_create_file(&fih_hs->sdev.dev,&dev_attr_btn_state);
 				if(ret)
 				{
 					pr_err("%s: device_create_file btn_state fail %d!\n", __func__, ret);
-					switch_dev_unregister(&fih_hs->sdev);
+					extcon_dev_unregister(&fih_hs->sdev);
 					kzfree(fih_hs);
 				}
 			}
 			else	{
-				pr_err("%s: switch_dev_register (%s) fail %d\n", __func__, fih_hs->sdev.name, ret);
+				pr_err("%s: extcon_dev_register (%s) fail %d\n", __func__, fih_hs->sdev.name, ret);
 				kzfree(fih_hs);
 			}
 		}

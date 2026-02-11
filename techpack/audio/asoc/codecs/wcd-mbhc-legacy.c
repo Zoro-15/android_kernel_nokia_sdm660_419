@@ -26,10 +26,6 @@ static int det_extn_cable_en;
 module_param(det_extn_cable_en, int, 0664);
 MODULE_PARM_DESC(det_extn_cable_en, "enable/disable extn cable detect");
 
-#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
-extern bool spk_ext_pa_is_on;
-#endif
-
 static bool wcd_mbhc_detect_anc_plug_type(struct wcd_mbhc *mbhc)
 {
 	bool anc_mic_found = false;
@@ -292,8 +288,13 @@ static void wcd_mbhc_update_fsm_source(struct wcd_mbhc *mbhc,
 	};
 }
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS) || defined (CONFIG_LONGCHEER_SDM660_PROJS)
+void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
+			enum wcd_mbhc_plug_type plug_type)
+#else
 static void wcd_enable_mbhc_supply(struct wcd_mbhc *mbhc,
 			enum wcd_mbhc_plug_type plug_type)
+#endif
 {
 
 	struct snd_soc_component *component = mbhc->component;
