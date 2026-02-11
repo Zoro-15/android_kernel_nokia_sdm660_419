@@ -78,7 +78,6 @@
 #define FTS_MAX_POINTS                      10
 #define FTS_KEY_WIDTH                       50
 #define FTS_ONE_TCH_LEN                     6
-#define POINT_READ_BUF  (3 + FTS_ONE_TCH_LEN * FTS_MAX_POINTS)
 
 #define FTS_MAX_ID                          0x0F
 #define FTS_TOUCH_X_H_POS                   3
@@ -143,6 +142,8 @@ struct fts_ts_data
     struct input_dev *input_dev;
     struct ts_event event;
     const struct fts_ts_platform_data *pdata;
+	u8 *point_buf;
+	int pnt_buf_size;
 #if FTS_PSENSOR_EN
     struct fts_psensor_platform_data *psensor_pdata;
 #endif
