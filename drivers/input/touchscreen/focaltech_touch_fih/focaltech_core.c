@@ -237,6 +237,7 @@ void fts_irq_enable(void)
 static int fts_input_dev_init( struct i2c_client *client, struct fts_ts_data *data,  struct input_dev *input_dev, struct fts_ts_platform_data *pdata)
 {
     int  err, len;
+    int point_num;
 
     FTS_FUNC_ENTER();
 
@@ -272,6 +273,14 @@ static int fts_input_dev_init( struct i2c_client *client, struct fts_ts_data *da
 #if FTS_REPORT_PRESSURE_EN
     input_set_abs_params(input_dev, ABS_MT_PRESSURE, 0, 0xFF, 0, 0);
 #endif
+
+	point_num = pdata->max_touch_number;
+	data->pnt_buf_size = point_num * FTS_ONE_TCH_LEN + 3;
+	data->point_buf = devm_kzalloc(&client->dev, data->pnt_buf_size, GFP_KERNEL);
+	if (!data->point_buf) {
+		FTS_ERROR("failed to alloc memory for point buf!");
+		return -ENOMEM;
+	}
 
     err = input_register_device(input_dev);
     if (err)
@@ -425,9 +434,9 @@ static void fts_show_touch_buffer(u8 *buf, int point_num)
     int i;
 
     memset(g_sz_debug, 0, 1024);
-    if (len > (POINT_READ_BUF-3))
+    if (len > (fts_wq_data->pnt_buf_size - 3))
     {
-        len = POINT_READ_BUF-3;
+        len = fts_wq_data->pnt_buf_size - 3;
     }
     else if (len == 0)
     {
@@ -672,7 +681,7 @@ static int fts_input_dev_report_a(struct ts_event *event,struct fts_ts_data *dat
 *****************************************************************************/
 static int fts_read_touchdata(struct fts_ts_data *data)
 {
-    u8 buf[POINT_READ_BUF] = { 0 };
+    u8 *buf = data->point_buf;
     u8 pointid = FTS_MAX_ID;
     int ret = -1;
     int i;
@@ -705,7 +714,7 @@ static int fts_read_touchdata(struct fts_ts_data *data)
 
 
 #if FTS_READ_TOUCH_BUFFER_DIVIDED
-    memset(buf, 0xFF, POINT_READ_BUF);
+    memset(buf, 0xFF, data->pnt_buf_size);
     memset(event, 0, sizeof(struct ts_event));
 
     buf[0] = 0x00;
@@ -727,7 +736,9 @@ static int fts_read_touchdata(struct fts_ts_data *data)
         fts_i2c_read(data->client, buf+9, 1, buf+9, (event->point_num - 1) * FTS_ONE_TCH_LEN);
     }
 #else
-    ret = fts_i2c_read(data->client, buf, 1, buf, POINT_READ_BUF);
+
+    memset(buf, 0, data->pnt_buf_size);
+    ret = fts_i2c_read(data->client, buf, 1, buf, data->pnt_buf_size);
     if (ret < 0)
     {
         BBOX_TP_I2C_READ_FAILED

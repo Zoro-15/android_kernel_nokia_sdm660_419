@@ -459,7 +459,7 @@ static int fts_gesture_read_buffer(struct i2c_client *client, u8 *buf, int read_
 ***********************************************************************/
 int fts_gesture_readdata(struct i2c_client *client)
 {
-    u8 buf[FTS_GESTRUE_POINTS * 4] = { 0 };
+    u8 *buf;
     int ret = -1;
     int i = 0;
     int gestrue_id = 0;
@@ -467,6 +467,14 @@ int fts_gesture_readdata(struct i2c_client *client)
     u8 pointnum;
 
     FTS_FUNC_ENTER();
+
+    buf = kzalloc(FTS_GESTRUE_POINTS * 4, GFP_KERNEL);
+    if (!buf) {
+        FTS_ERROR("alloc gesture buffer failed");
+        FTS_FUNC_EXIT();
+        return -ENOMEM;
+    }
+
     /* init variable before read gesture point */
     memset(fts_gesture_data.header, 0, FTS_GESTRUE_POINTS_HEADER);
     memset(fts_gesture_data.coordinate_x, 0, FTS_GESTRUE_POINTS * sizeof(u16));
@@ -477,8 +485,7 @@ int fts_gesture_readdata(struct i2c_client *client)
     if (ret < 0)
     {
         FTS_ERROR("[GESTURE]Read gesture header data failed!!");
-        FTS_FUNC_EXIT();
-        return ret;
+        goto out;
     }
 
     /* FW recognize gesture */
@@ -494,8 +501,7 @@ int fts_gesture_readdata(struct i2c_client *client)
         if (ret < 0)
         {
             FTS_ERROR("[GESTURE]Read gesture touch data failed!!");
-            FTS_FUNC_EXIT();
-            return ret;
+            goto out;
         }
 
         fts_check_gesture(fts_input_dev,gestrue_id);
@@ -506,8 +512,8 @@ int fts_gesture_readdata(struct i2c_client *client)
             fts_gesture_data.coordinate_y[i] = (((s16) buf[2 + (4 * i + 2)]) & 0x0F) << 8
                                                | (((s16) buf[3 + (4 * i + 2)]) & 0xFF);
         }
-        FTS_FUNC_EXIT();
-        return 0;
+        ret = 0;
+        goto out;
     }
     /* other IC's gestrue in driver */
     if (0x24 == buf[0])
@@ -515,8 +521,8 @@ int fts_gesture_readdata(struct i2c_client *client)
         gestrue_id = 0x24;
         fts_check_gesture(fts_input_dev,gestrue_id);
         FTS_DEBUG("[GESTURE]%d check_gesture gestrue_id", gestrue_id);
-        FTS_FUNC_EXIT();
-        return -1;
+        ret = -1;
+        goto out;
     }
 
     /* Host Driver recognize gesture */
@@ -527,8 +533,7 @@ int fts_gesture_readdata(struct i2c_client *client)
     if (ret < 0)
     {
         FTS_ERROR("[GESTURE]Driver recognize gesture - Read gesture touch data failed!!");
-        FTS_FUNC_EXIT();
-        return ret;
+        goto out;
     }
 
     /*
@@ -547,8 +552,11 @@ int fts_gesture_readdata(struct i2c_client *client)
         fts_gesture_data.coordinate_y[i] = (((s16) buf[2 + (4 * i+8)]) & 0x0F) << 8
                                            | (((s16) buf[3 + (4 * i+8)]) & 0xFF);
     }
+    ret = -1;
+out:
+    kfree(buf);
     FTS_FUNC_EXIT();
-    return -1;
+    return ret;
 }
 
 /*****************************************************************************
