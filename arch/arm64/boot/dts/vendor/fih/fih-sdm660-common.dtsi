@@ -51,6 +51,12 @@
 			<22 512 0 6400000>;
 };
 
+&soc {
+	restart@10ac000 {
+		qcom,force-warm-reboot;
+	};
+};
+
 &tlmm {
     fih_lcm_boost: fih_lcm_boost {
         fih_lcm_boost_active: fih_lcm_boost_active {
