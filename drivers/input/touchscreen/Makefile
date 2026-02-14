@@ -114,6 +114,7 @@ obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX) += synaptics_dsx/
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_TCM)	+= synaptics_tcm/
 obj-$(CONFIG_TOUCHSCREEN_FTS)	+= focaltech_touch/
 obj-$(CONFIG_TOUCHSCREEN_FTS_FIH)		+= focaltech_touch_fih/
+obj-$(CONFIG_TOUCHSCREEN_FTS_LC)        += focaltech_touch_lc/
 obj-$(CONFIG_TOUCHSCREEN_FT8719)	+= focaltech_touch_8719/
 obj-$(CONFIG_TOUCHSCREEN_GX)		+= gt1x/
 obj-$(CONFIG_TOUCHSCREEN_GT9XX)		+= gt9xx/
