@@ -1307,6 +1307,14 @@ config TOUCHSCREEN_ST
 	  To compile this driver as a module, choose M here: the
 	  module will be called st.
 
+config LC_TOUCHSCREEN_INFO
+        bool "Longcheer Touchscreen Info driver"
+        depends on I2C
+        help
+          Say Y here if you have a Longcheer Touchscreen Info.
+
+          If unsure, say N.
+
 source "drivers/input/touchscreen/st/Kconfig"
 
 config TOUCHSCREEN_SYNAPTICS_DSX
