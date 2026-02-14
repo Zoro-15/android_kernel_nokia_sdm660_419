@@ -118,5 +118,6 @@ obj-$(CONFIG_TOUCHSCREEN_FTS_LC)        += focaltech_touch_lc/
 obj-$(CONFIG_TOUCHSCREEN_FT8719)	+= focaltech_touch_8719/
 obj-$(CONFIG_TOUCHSCREEN_GX)		+= gt1x/
 obj-$(CONFIG_TOUCHSCREEN_GT9XX)		+= gt9xx/
+obj-$(CONFIG_TOUCHSCREEN_HIMAX)		+= hxchipset/
 obj-$(CONFIG_TOUCHSCREEN_NT36xxx_FIH)	+= nt36xxx_fih/
 obj-$(CONFIG_TOUCHSCREEN_NT36XXX)	+= nt36xxx/
