@@ -11,6 +11,7 @@ menuconfig INPUT_FINGERPRINT
 
 if INPUT_FINGERPRINT
 
+source "drivers/input/fingerprint/cdfinger/Kconfig"
 source "drivers/input/fingerprint/elan/Kconfig"
 source "drivers/input/fingerprint/fpc1020/Kconfig"
 source "drivers/input/fingerprint/ft9362/Kconfig"

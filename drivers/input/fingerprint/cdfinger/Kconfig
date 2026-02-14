@@ -1,0 +1,5 @@
+config FINGERPRINT_CDFINGER
+       tristate "Cdfinger driver"
+       default n
+       help
+          This is a Cdfinger chipset Driver.
