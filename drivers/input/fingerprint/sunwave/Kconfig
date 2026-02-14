@@ -1,0 +1,5 @@
+config FINGERPRINT_SUNWAVE
+        bool "Sunwave Driver"
+        default n
+        help
+          This is a Sunwave chipset Driver.
