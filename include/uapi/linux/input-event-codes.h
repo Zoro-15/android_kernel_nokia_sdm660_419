@@ -649,6 +649,13 @@
 #define KEY_DATA			0x277
 #define KEY_ONSCREEN_KEYBOARD		0x278
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+#define KEY_FINGERPRINT_UP      0x282
+#define KEY_FINGERPRINT_DOWN        0x283
+#define KEY_FINGERPRINT_LEFT        0x281
+#define KEY_FINGERPRINT_RIGHT       0x280
+#endif
+
 #define BTN_TRIGGER_HAPPY		0x2c0
 #define BTN_TRIGGER_HAPPY1		0x2c0
 #define BTN_TRIGGER_HAPPY2		0x2c1
@@ -690,6 +697,19 @@
 #define BTN_TRIGGER_HAPPY38		0x2e5
 #define BTN_TRIGGER_HAPPY39		0x2e6
 #define BTN_TRIGGER_HAPPY40		0x2e7
+
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+//begin xiaopei add sar sensor key
+#define BTN_CAP_PROX		0x2e8
+#define BTN_CAP_BODY		0x2e9
+
+// add for sar ant check by xiaopei at 20190520
+#define KEY_ANT_HB_CONNECT         0x292
+#define KEY_ANT_HB_UNCONNECT       0x293
+
+#define KEY_ANT_MB_CONNECT         0x294
+#define KEY_ANT_MB_UNCONNECT       0x295
+#endif
 
 /* We avoid low common keys in module aliases so they don't get huge. */
 #define KEY_MIN_INTERESTING	KEY_MUTE
