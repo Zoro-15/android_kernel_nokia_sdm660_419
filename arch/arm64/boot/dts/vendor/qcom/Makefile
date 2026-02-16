@@ -307,7 +307,7 @@ sda660-cdp-external-codec-overlay.dtbo-base := sda660-pm660l.dtb
 
 sda660-rcm-external-codec-overlay.dtbo-base := sda660-pm660l.dtb
 else
-ifneq ($(CONFIG_FIH_SDM630_SDM660_PROJS),y)
+ifneq ($(filter n,$(CONFIG_FIH_SDM630_SDM660_PROJS) $(CONFIG_LONGCHEER_SDM660_PROJS)),)
 dtb-$(CONFIG_ARCH_SDM660) += sdm660-sim.dtb \
 sdm660-internal-codec-cdp.dtb \
         sdm660-internal-codec-mtp.dtb \
@@ -424,7 +424,7 @@ dtb-$(CONFIG_ARCH_SDM429) += sdm429-mtp.dtb \
 	sda429-cdp.dtb
 endif
 
-ifneq ($(CONFIG_FIH_SDM630_SDM660_PROJS),y)
+ifneq ($(filter n,$(CONFIG_FIH_SDM630_SDM660_PROJS) $(CONFIG_LONGCHEER_SDM660_PROJS)),)
 ifeq ($(CONFIG_ARCH_SDM630),y)
 dtb-$(CONFIG_ARCH_SDM630) += sdm630-cdp.dtb \
 sdm630-mtp.dtb \

@@ -508,4 +508,22 @@ config FIH_TAISHAN
         help
           Support for FIH Taishan devices
 
+config LONGCHEER_SDM660_PROJS
+	bool "Longcheer SDM660"
+	select ARCH_SDM660
+	help
+		Support for Longcheer SDM660 devices
+
+config LONGCHEER_STARLORD
+        bool "Longcheer Starlord project"
+        select LONGCHEER_SDM660_PROJS
+        help
+          Support for Longcheer Starlord devices
+
+config LONGCHEER_DAREDEVIL
+        bool "Longcheer Daredevil project"
+        select LONGCHEER_SDM660_PROJS
+        help
+          Support for Longcheer Daredevil devices
+
 endmenu
