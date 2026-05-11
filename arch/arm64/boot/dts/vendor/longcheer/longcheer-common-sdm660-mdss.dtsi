@@ -101,7 +101,7 @@
 		<&mdss_dsi0_pll PIX0_SRC_CLK>,
 		<&mdss_dsi0_pll SHADOW_BYTE0_SRC_CLK>,
 		<&mdss_dsi0_pll SHADOW_PIX0_SRC_CLK>,
-		<&clock_rpmcc RPM_LN_BB_CLK2>;         //modify by shenwenbin for M690 display 20190312 
+		<&clock_rpmcc RPM_SMD_LN_BB_CLK2>;         //modify by shenwenbin for M690 display 20190312
 	clock-names = "byte_clk", "pixel_clk", "core_clk",
 		"byte_clk_rcg", "pixel_clk_rcg",
 		"byte_intf_clk", "pll_byte_clk_mux",

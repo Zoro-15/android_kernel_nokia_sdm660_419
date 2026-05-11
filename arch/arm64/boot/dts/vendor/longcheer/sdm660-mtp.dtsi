@@ -129,7 +129,7 @@
 		pinctrl-names = "nfc_active", "nfc_suspend";
 		pinctrl-0 = <&nfc_int_active &nfc_enable_active>;
 		pinctrl-1 = <&nfc_int_suspend &nfc_enable_suspend>;
-		clocks = <&clock_rpmcc RPM_LN_BB_CLK3>;
+		clocks = <&clock_rpmcc RPM_SMD_LN_BB_CLK3>;
 		clock-names = "OSC_NFC";
 	};
 };
@@ -150,7 +150,7 @@
 	qcom,platform-reset-gpio = <&tlmm 53 0>;
         qcom,px8418-reset-gpio = <&tlmm 25 0>;
 	qcom,platform-te-gpio = <&tlmm 59 0>;
-        //clocks = <&clock_rpmcc RPM_LN_BB_CLK2>;
+        //clocks = <&clock_rpmcc RPM_SMD_LN_BB_CLK2>;
 	//clock-names = "bb_clk_2";
 };
 
