@@ -69,8 +69,10 @@ struct fts_ts_data *fts_wq_data;
 struct input_dev *fts_input_dev;
 
 extern int tp_probe_success;	//SW4-HL-TouchPanel-AccordingToTPDriverProbeResultToDecideWhetherToCreateVirtualFileOrNot-00+_20151130
+#if FTS_TEST_EN
 extern void touch_selftest(void);
 extern int selftest_result_read(void);
+#endif
 extern void touch_tpfwver_read(char *);
 extern void touch_tpfwimver_read(char *fw_ver);
 extern void touch_fwupgrade(int);
@@ -1416,8 +1418,10 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 #endif
 
     tp_probe_success = 1; //SW4-HL-TouchPanel-AccordingToTPDriverProbeResultToDecideWhetherToCreateVirtualFileOrNot-00+_20151130
+#if FTS_TEST_EN
     touch_cb.touch_selftest = touch_selftest;
     touch_cb.touch_selftest_result = selftest_result_read;
+#endif
     touch_cb.touch_tpfwver_read = touch_tpfwver_read;
     touch_cb.touch_tpfwimver_read = touch_tpfwimver_read;
     touch_cb.touch_fwupgrade = touch_fwupgrade;
