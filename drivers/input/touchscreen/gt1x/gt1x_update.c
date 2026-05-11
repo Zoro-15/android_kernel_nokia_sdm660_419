@@ -785,7 +785,7 @@ int gt1x_hold_ss51_dsp(void)
     } while (retry-- && ret < 0);
 
 	if (ret < 0)
-        return ERROR;
+		return ERROR;
 
 	//hold ss51_dsp
 	ret = __gt1x_hold_ss51_dsp_20();
