@@ -48,36 +48,31 @@
 
 static inline int smc_fastcall(void *fc_generic, size_t size)
 {
-	if (is_scm_armv8()) {
-		struct scm_desc desc = {0};
-		int ret;
-		void *scm_buf = NULL;
+	struct scm_desc desc = {0};
+	int ret;
+	void *scm_buf = NULL;
 
-		scm_buf = kzalloc(PAGE_ALIGN(size), GFP_KERNEL);
-		if (!scm_buf)
-			return -ENOMEM;
-		memcpy(scm_buf, fc_generic, size);
-		dmac_flush_range(scm_buf, scm_buf + size);
+	scm_buf = kzalloc(PAGE_ALIGN(size), GFP_KERNEL);
+	if (!scm_buf)
+		return -ENOMEM;
+	memcpy(scm_buf, fc_generic, size);
+	dmac_flush_range(scm_buf, scm_buf + size);
 
-		desc.arginfo = TZ_EXECUTIVE_EXT_ID_PARAM_ID;
-		desc.args[0] = virt_to_phys(scm_buf);
-		desc.args[1] = (u32)size;
-		desc.args[2] = virt_to_phys(scm_buf);
-		desc.args[3] = (u32)size;
+	desc.arginfo = TZ_EXECUTIVE_EXT_ID_PARAM_ID;
+	desc.args[0] = virt_to_phys(scm_buf);
+	desc.args[1] = (u32)size;
+	desc.args[2] = virt_to_phys(scm_buf);
+	desc.args[3] = (u32)size;
 
-		ret = scm_call2(
-			SCM_MOBIOS_FNID(SCM_SVC_MOBICORE, SCM_CMD_MOBICORE),
-				&desc);
+	ret = scm_call2(
+		SCM_MOBIOS_FNID(SCM_SVC_MOBICORE, SCM_CMD_MOBICORE),
+			&desc);
 
-		dmac_flush_range(scm_buf, scm_buf + size);
+	dmac_flush_range(scm_buf, scm_buf + size);
 
-		memcpy(fc_generic, scm_buf, size);
-		kfree(scm_buf);
-		return ret;
-	}
-	return scm_call(SCM_SVC_MOBICORE, SCM_CMD_MOBICORE,
-			fc_generic, size,
-			fc_generic, size);
+	memcpy(fc_generic, scm_buf, size);
+	kfree(scm_buf);
+	return ret;
 }
 
 /*
