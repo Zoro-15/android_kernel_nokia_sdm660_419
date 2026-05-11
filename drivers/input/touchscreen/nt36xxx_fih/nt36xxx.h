@@ -2,7 +2,7 @@
  * Copyright (C) 2010 - 2017 Novatek, Inc.
  *
  * $Revision: 20563 $
- * $Date: 2017-12-20 14:20:44 +0800 (?±‰?, 20 ?Å‰???2017) $
+ * $Date: 2017-12-20 14:20:44 +0800 (?ÔøΩÔøΩ?, 20 ?ÔøΩÔøΩ???2017) $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
 
 #include <linux/i2c.h>
 #include <linux/input.h>
+#include <linux/uaccess.h>
 
 #ifdef CONFIG_HAS_EARLYSUSPEND
 #include <linux/earlysuspend.h>
