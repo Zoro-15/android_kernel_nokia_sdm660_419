@@ -97,24 +97,6 @@
 };
 /*modify by shenwenbin for M690 display 20190312 end*/
 
-&red_led {
-	linux,name = "orange";
-};
-
-&blue_led {
-	qcom,pause-lo = <0>;
-	qcom,pause-hi = <0>;
-	qcom,ramp-step-ms = <100>;
-	qcom,lut-flags = <1>;
-	linux,name = "red";
-	qcom,start-idx = <0>;
-	qcom,idx-len = <22>;
-	qcom,duty-pcts =
-		[01 0a 14 1e 28 32 3c 46 50 5a 64
-		64 5a 50 46 3c 32 28 1e 14 0a 01];
-	qcom,use-blink;
-};
-
 &pm660l_wled {
 	qcom,cons-sync-write-delay-us = <4000>; //modify by shenwenbin for slide backlight bar flicker 20190712
     qcom,wled-stepper-en;   //modify by shenwenbin for slide backlight bar flicker 20190712
