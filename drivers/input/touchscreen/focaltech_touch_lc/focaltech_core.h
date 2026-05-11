@@ -190,11 +190,6 @@ struct fts_ts_data {
     struct pinctrl_state *pins_suspend;
     struct pinctrl_state *pins_release;
 #endif
-/*
-#if FTS_GESTURE_EN
-    struct wakeup_source fts_ts_wake_lock;
-#endif
-*/
 #if defined(CONFIG_FB)
     struct notifier_block fb_notif;
 #elif defined(CONFIG_HAS_EARLYSUSPEND)

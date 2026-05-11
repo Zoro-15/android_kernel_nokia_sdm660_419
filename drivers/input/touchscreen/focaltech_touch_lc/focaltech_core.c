@@ -57,11 +57,6 @@
 #define FTS_VTG_MAX_UV                      1800000
 #endif
 
-/*
-#if FTS_GESTURE_EN
-#define FTS_TS_WAKE_LOCK_TIMEOUT		(5000)
-#endif
-*/
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
@@ -565,14 +560,7 @@ static int fts_read_touchdata(struct fts_ts_data *data)
    // FTS_FUNC_ENTER();
 
     memset(buf, 0xFF, data->pnt_buf_size);
-/*
-#if FTS_GESTURE_EN
-    if(data->suspended == true && tp_gesture_wakeup() == 1){   
-        __pm_wakeup_event(&data->fts_ts_wake_lock, FTS_TS_WAKE_LOCK_TIMEOUT);
-        msleep(100);
-     }
-#endif
-*/
+
     ret = fts_read(NULL, 0, buf + 1, data->pnt_buf_size - 1);
 
     /*modify by shenwenbin for some devices resume have touch need wait 2-3 seconds 20190514 begin*/    
@@ -681,14 +669,7 @@ static void fts_irq_read_report(void)
 #if FTS_POINT_REPORT_CHECK_EN
     fts_prc_queue_work(ts_data);
 #endif
-/*
-#if FTS_GESTURE_EN
-        if(ts_data->suspended == true && tp_gesture_wakeup() == 1){   
-            __pm_wakeup_event(&ts_data->fts_ts_wake_lock, FTS_TS_WAKE_LOCK_TIMEOUT);
-            msleep(150);
-         }
-#endif
-*/
+
     ret = fts_read_parse_touchdata(ts_data);
     if (ret == 0) {
         mutex_lock(&ts_data->report_mutex);
@@ -1384,7 +1365,6 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     if (ret) {
         FTS_ERROR("init gesture fail");
     }
-    //wakeup_source_init(&ts_data->fts_ts_wake_lock, FTS_DRIVER_NAME);
 #endif
 
 
@@ -1427,11 +1407,6 @@ static int fts_ts_probe_entry(struct fts_ts_data *ts_data)
     return 0;
 
 err_irq_req:
-/*
-#if FTS_GESTURE_EN
-    wakeup_source_trash(&ts_data->fts_ts_wake_lock);
-#endif
-*/
 #if FTS_POWER_SOURCE_CUST_EN
 err_power_init:
     fts_power_source_exit(ts_data);
@@ -1483,7 +1458,6 @@ static int fts_ts_remove_entry(struct fts_ts_data *ts_data)
 
 #if FTS_GESTURE_EN
     fts_gesture_exit(ts_data);
-    //wakeup_source_trash(&ts_data->fts_ts_wake_lock);
 #endif
 
     fts_bus_exit(ts_data);
