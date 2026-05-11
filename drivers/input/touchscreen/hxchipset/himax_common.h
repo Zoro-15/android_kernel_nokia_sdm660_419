@@ -378,7 +378,7 @@ struct himax_ts_data {
 #ifdef HX_SMART_WAKEUP
 	uint8_t SMWP_enable;
 	uint8_t gesture_cust_en[26];
-	struct wakeup_source ts_SMWP_wake_lock;
+	struct wakeup_source *ts_SMWP_wake_lock;
 #ifdef HX_P_SENSOR
 	bool psensor_flag;
 #endif

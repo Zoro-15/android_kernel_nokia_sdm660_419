@@ -1174,7 +1174,7 @@ static int himax_touch_get(struct himax_ts_data *ts, uint8_t *buf, int ts_path, 
 
 	/*SMWP*/
 	case HX_REPORT_SMWP_EVENT:
-		__pm_wakeup_event(&ts->ts_SMWP_wake_lock, TS_WAKE_LOCK_TIMEOUT);
+		__pm_wakeup_event(ts->ts_SMWP_wake_lock, TS_WAKE_LOCK_TIMEOUT);
 		msleep(20);     //modify by shenwenbin for wakeup slowly 20190610
 		g_core_fp.fp_burst_enable(0);
 
@@ -2327,7 +2327,8 @@ FW_force_upgrade:
 #ifdef HX_SMART_WAKEUP
 	ts->SMWP_enable = 0;
         ts->gesture_cust_en[0] = 1;     /*modify by shenwenbin for open double tap wakeup 20190516*/
-	wakeup_source_init(&ts->ts_SMWP_wake_lock, HIMAX_common_NAME);
+
+	ts->ts_SMWP_wake_lock = wakeup_source_register(ts->dev, HIMAX_common_NAME);
 #endif
 #ifdef HX_HIGH_SENSE
 	ts->HSEN_enable = 0;
@@ -2376,7 +2377,7 @@ err_register_interrupt_failed:
 err_creat_proc_file_failed:
 err_report_data_init_failed:
 #ifdef HX_SMART_WAKEUP
-	wakeup_source_trash(&ts->ts_SMWP_wake_lock);
+	wakeup_source_destroy(ts->ts_SMWP_wake_lock);
 #endif
 #ifdef CONFIG_FB
 	cancel_delayed_work_sync(&ts->work_att);
@@ -2442,7 +2443,7 @@ void himax_chip_common_deinit(void)
 	}
 
 #ifdef HX_SMART_WAKEUP
-	wakeup_source_trash(&ts->ts_SMWP_wake_lock);
+	wakeup_source_destroy(ts->ts_SMWP_wake_lock);
 #endif
 #ifdef CONFIG_FB
 	if (fb_unregister_client(&ts->fb_notif))
