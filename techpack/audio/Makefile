@@ -26,6 +26,34 @@ endif
 ifeq ($(CONFIG_ARCH_SDM660), y)
 include $(srctree)/techpack/audio/config/sdm660auto.conf
 export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/sdm660auto.conf)
+ifeq ($(CONFIG_LONGCHEER_DAREDEVIL), y)
+include $(srctree)/techpack/audio/config/ddv_sld.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/ddv_sld.conf)
+endif
+ifeq ($(CONFIG_LONGCHEER_STARLORD), y)
+include $(srctree)/techpack/audio/config/ddv_sld.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/ddv_sld.conf)
+endif
+ifeq ($(CONFIG_FIH_ONYX), y)
+include $(srctree)/techpack/audio/config/b2n_ctl.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/b2n_ctl.conf)
+endif
+ifeq ($(CONFIG_FIH_CRYSTAL), y)
+include $(srctree)/techpack/audio/config/b2n_ctl.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/b2n_ctl.conf)
+endif
+ifeq ($(CONFIG_FIH_DRAGON), y)
+include $(srctree)/techpack/audio/config/drg_pl2.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/drg_pl2.conf)
+endif
+ifeq ($(CONFIG_FIH_PLATE2), y)
+include $(srctree)/techpack/audio/config/drg_pl2.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/drg_pl2.conf)
+endif
+ifeq ($(CONFIG_FIH_TAISHAN), y)
+include $(srctree)/techpack/audio/config/tas.conf
+export $(shell sed 's/=.*//' $(srctree)/techpack/audio/config/tas.conf)
+endif
 endif
 
 # Use USERINCLUDE when you must reference the UAPI directories only.
@@ -66,6 +94,34 @@ endif
 ifeq ($(CONFIG_ARCH_SDM660), y)
 LINUXINCLUDE    += \
                 -include $(srctree)/techpack/audio/config/sdm660autoconf.h
+ifeq ($(CONFIG_LONGCHEER_DAREDEVIL), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/ddv_sld.h
+endif
+ifeq ($(CONFIG_LONGCHEER_STARLORD), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/ddv_sld.h
+endif
+ifeq ($(CONFIG_FIH_ONYX), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/b2n_ctl.h
+endif
+ifeq ($(CONFIG_FIH_CRYSTAL), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/b2n_ctl.h
+endif
+ifeq ($(CONFIG_FIH_DRAGON), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/drg_pl2.h
+endif
+ifeq ($(CONFIG_FIH_PLATE2), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/drg_pl2.h
+endif
+ifeq ($(CONFIG_FIH_TAISHAN), y)
+LINUXINCLUDE    += \
+                -include $(srctree)/techpack/audio/config/tas.h
+endif
 endif
 obj-y += soc/
 obj-y += dsp/
