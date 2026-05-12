@@ -61,18 +61,4 @@
 //	qcom,jeita-cc-comp-warm = <0>;	/* 1850mA = 1850mA - 0mA */
 	qcom,thermal-mitigation
 					= <1500000 1200000 1500000>;
-/* VBAT_LOW	VBAT_HIGH	FCC */
-	qcom,step-fcc-cfg = <3000000 4180000 3400000>,
-					<4181000 4400000 1850000>;
-/* TEMP_LOW	TEMP_HIGH	FCC */
-	qcom,jeita-fcc-cfg = <0 57 370000>,
-					<58 157 1110000>,
-					<158 440 3400000>,
-					<441 550 1850000>;
-/* TEMP_LOW	TEMP_HIGH	FV */
-	qcom,jeita-fv-cfg = <0 157 4400000>,
-					<158 440 4400000>,
-					<441 550 4100000>;
-	qcom,step-fcc-hysteresis = <20000>;
-	qcom,jeita-fcc-fv-hysteresis = <6>;
 };

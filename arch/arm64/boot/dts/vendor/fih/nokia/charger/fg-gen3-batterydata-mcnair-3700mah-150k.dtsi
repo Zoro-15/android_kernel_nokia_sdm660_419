@@ -9,14 +9,20 @@ qcom,3236815_fih_he346mcnair_3700mah_averaged_masterslave_dec14th2017 {
 	qcom,batt-id-kohm = <150>;
 	qcom,battery-beta = <3435>;
 	qcom,battery-type = "B2N_mcnair_3700mah_150k_dec14th2017";
-	qcom,jeita-fcc-ranges = <0   150   600000
-				 151  450  2000000
-				 451 550  600000>;
-	qcom,jeita-fv-ranges = <0   150  4100000
-				151 450  4400000
-				451 550  4100000>;
-	qcom,step-chg-ranges = <3000000  4100000  2000000
-				4101000  4400000  1200000>;
+
+	/* TEMP_LOW	TEMP_HIGH	FCC */
+	qcom,jeita-fcc-ranges = <0 57 370000
+				 58 157 1110000
+				 158 440 3400000
+				 441 550 1850000>;
+	/* TEMP_LOW	TEMP_HIGH	FV */
+	qcom,jeita-fv-ranges = <0 157 4400000
+				158 440 4400000
+				441 550 4100000>;
+	/* VBAT_LOW	VBAT_HIGH	FCC */
+	qcom,step-chg-ranges = <3000000 4180000 3400000
+				4181000 4400000 1850000>;
+
 	qcom,checksum = <0x4D5E>;
 	qcom,gui-version = "PM660GUI - 0.0.0.45";
 	qcom,fg-profile-data = [

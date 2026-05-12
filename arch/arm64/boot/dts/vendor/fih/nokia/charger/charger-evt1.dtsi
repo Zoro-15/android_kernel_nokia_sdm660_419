@@ -7,7 +7,6 @@
 		#include "fg-gen3-batterydata-fake-3000mah-39k.dtsi"
 		#include "fg-gen3-batterydata-XF-3000mah-300k.dtsi"
 		#include "fg-gen3-batterydata-coslight-3000mah-200k.dtsi"
-	//	#include "fg-gen3-batterydata-unkown-3000mah-ffffk.dtsi"
 	};
 };
 
@@ -58,19 +57,6 @@
 //	qcom,jeita-cc-comp-warm = <600000>;	/* 900mA = 1500mA - 600mA */
 	qcom,thermal-mitigation = <3000000 2700000 2500000 2300000 2100000 2000000
 		1600000 1200000 1000000 700000 600000 500000 100000 0>;
-/* VBAT_LOW	VBAT_HIGH	FCC */
-	qcom,step-fcc-cfg = <3000000 4180000 3000000>,
-					<4181000 4400000 1500000>;
-/* TEMP_LOW	TEMP_HIGH	FCC */
-	qcom,jeita-fcc-cfg = <0 157 600000>,
-					<158 440 3000000>,
-					<441 550 900000>;
-/* TEMP_LOW	TEMP_HIGH	FV */
-	qcom,jeita-fv-cfg = <0 157 4400000>,
-					<158 440 4400000>,
-					<441 550 4100000>;
-	qcom,step-fcc-hysteresis = <20000>;
-	qcom,jeita-fcc-fv-hysteresis = <6>;
 };
 
 &i2c_2 {
