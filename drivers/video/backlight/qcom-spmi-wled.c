@@ -1684,6 +1684,52 @@ static struct device_attribute wled_flash_attrs[] = {
 		NULL),
 };
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+/* SW4-HL-Display-HDR-SetFsCurr-00+{_20180515 */
+static struct wled *g_wled;
+int qpnp_wled_fs_curr_ua_set(int data)
+{
+	int i, rc = 0;
+	int idx;
+	u16 addr;
+
+	/* on qpnp_wled
+	 * QPNP_WLED_FS_CURR_MIN_UA = 0
+	 * QPNP_WLED_FS_CURR_MAX_UA = 30000
+	 * QPNP_WLED_FS_CURR_STEP_UA = 2500
+	  */
+	if (data < 0)
+		data = 0;
+	else if (data > 30000)
+		data = 30000;
+
+	/* convert µA to register index */
+	idx = data / 2500;
+
+	for (i = 0; (g_wled->cfg.string_cfg >> i) != 0; i++) {
+		if (g_wled->cfg.string_cfg & BIT(i)) {
+			addr = g_wled->sink_addr + WLED_SINK_FS_CURR_REG(i);
+			rc = regmap_update_bits(g_wled->regmap, addr,
+						WLED_SINK_FS_MASK, idx);
+			if (rc < 0) {
+				pr_err("regmap_update_bits failed rc=%d\n", rc);
+				return rc;
+			}
+		}
+	}
+
+	g_wled->cfg.fs_current = idx; /* store index  */
+
+	rc = wled_sync_toggle(g_wled);//is this needed?
+	if (rc < 0)
+		pr_err("wled_sync_toggle failed rc=%d\n", rc);
+
+	return rc;
+}
+EXPORT_SYMBOL(qpnp_wled_fs_curr_ua_set);
+/* SW4-HL-Display-HDR-SetFsCurr-00+}_20180515 */
+#endif
+
 int wled_flash_led_prepare(struct led_trigger *trig, int options,
 				int *max_current)
 {
@@ -2368,6 +2414,10 @@ static int wled_probe(struct platform_device *pdev)
 
 	wled->regmap = regmap;
 	wled->pdev = pdev;
+
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	g_wled = wled;	//SW4-HL-Display-HDR-SetFsCurr-00+_20180515
+#endif
 
 	wled->version = of_device_get_match_data(&pdev->dev);
 	if (!wled->version) {
