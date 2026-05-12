@@ -5,7 +5,7 @@
 #include <dsp/apr_audio-v2.h>
 #include <sound/soc.h>
 
-#define SMART_AMP 
+#define SMART_AMP
 
 /* Below 3 should be same as in aDSP code */
 #define AFE_PARAM_ID_SMARTAMP_DEFAULT   0x10001166
@@ -80,9 +80,9 @@ struct afe_smartamp_calib_get_resp {
 	struct afe_smartamp_get_params_t res_cfg;
 } __packed;
 
-void codec_smartamp_add_controls(struct snd_soc_codec *codec);
+void codec_smartamp_add_controls(struct snd_soc_component *component);
 
-void codec_smartamp_remove_controls(struct snd_soc_codec *codec);
+void codec_smartamp_remove_controls(struct snd_soc_component *component);
 
 int afe_smartamp_get_calib_data(struct afe_smartamp_get_calib *calib_resp,
 		uint32_t param_id, uint32_t module_id);

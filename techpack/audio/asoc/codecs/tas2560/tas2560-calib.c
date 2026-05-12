@@ -31,7 +31,7 @@
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
 #include <linux/miscdevice.h>
-#include <sound/smart_amp.h>
+#include <dsp/smart_amp.h>
 
 /* Holds the Packet data required for processing */
 struct tas_dsp_pkt {
