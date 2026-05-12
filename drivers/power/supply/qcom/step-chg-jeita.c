@@ -84,68 +84,6 @@ static struct step_chg_info *the_chip;
 #define GET_CONFIG_RETRY_COUNT		50
 #define WAIT_BATT_ID_READY_MS		200
 
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
-int fih_set_step_chg_hysteresis(int hysteresis, int mode)
-{
-	if(hysteresis < 0)
-		return -1;
-
-	switch(mode) {
-	case STEP_CHG_CFG:
-		the_chip->step_chg_config->param.hysteresis = hysteresis;
-		break;
-	case JEITA_FCC_CFG:
-		the_chip->jeita_fcc_config->param.hysteresis = hysteresis;
-		break;
-	case JEITA_FV_CFG:
-		the_chip->jeita_fv_config->param.hysteresis = hysteresis;
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
-
-int fih_set_step_chg_cfg(int *cfg, int cfg_len, int mode)
-{
-	int i =0;
-
-	if(cfg_len > MAX_STEP_CHG_ENTRIES)
-		return -1;
-
-	switch(mode) {
-	case STEP_CHG_CFG:
-		for(i=0; i < cfg_len; i++)
-		{
-			the_chip->step_chg_config->fcc_cfg[i].low_threshold = cfg[i*3];
-			the_chip->step_chg_config->fcc_cfg[i].high_threshold = cfg[i*3 + 1];
-			the_chip->step_chg_config->fcc_cfg[i].value = cfg[i*3 + 2];
-		}
-		break;
-	case JEITA_FCC_CFG:
-		for(i=0; i < cfg_len; i++)
-		{
-			the_chip->jeita_fcc_config->fcc_cfg[i].low_threshold = cfg[i*3];
-			the_chip->jeita_fcc_config->fcc_cfg[i].high_threshold = cfg[i*3 + 1];
-			the_chip->jeita_fcc_config->fcc_cfg[i].value = cfg[i*3 + 2];
-		}
-		break;
-	case JEITA_FV_CFG:
-		for(i=0; i < cfg_len; i++)
-		{
-			the_chip->jeita_fv_config->fv_cfg[i].low_threshold = cfg[i*3];
-			the_chip->jeita_fv_config->fv_cfg[i].high_threshold = cfg[i*3 + 1];
-			the_chip->jeita_fv_config->fv_cfg[i].value = cfg[i*3 + 2];
-		}
-		break;
-	default:
-		break;
-	}
-	return 0;
-
-}
-#endif
-
 static bool is_batt_available(struct step_chg_info *chip)
 {
 	if (!chip->batt_psy)
@@ -924,7 +862,15 @@ int qcom_step_chg_init(struct device *dev,
 
 	chip->step_chg_config->param.psy_prop = POWER_SUPPLY_PROP_VOLTAGE_NOW;
 	chip->step_chg_config->param.prop_name = "VBATT";
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	/*
+	 *CONFIG_FIH_DRAGON sdm660-mtp-drg-preEVT.dtb does not has its own charger settings
+	 */
+#if (defined(CONFIG_FIH_SDM630_SDM660_PROJS) || \
+     defined(CONFIG_FIH_CHARM) || \
+     defined(CONFIG_FIH_ONYX) || \
+     defined(CONFIG_FIH_PLATE2)) && \
+    !defined(CONFIG_FIH_CRYSTAL) && \
+    !defined(CONFIG_FIH_TAISHAN)
 	chip->step_chg_config->param.hysteresis = 20000;
 #else
 	chip->step_chg_config->param.hysteresis = 100000;
@@ -939,10 +885,28 @@ int qcom_step_chg_init(struct device *dev,
 
 	chip->jeita_fcc_config->param.psy_prop = POWER_SUPPLY_PROP_TEMP;
 	chip->jeita_fcc_config->param.prop_name = "BATT_TEMP";
+#if (defined(CONFIG_FIH_SDM630_SDM660_PROJS) || \
+     defined(CONFIG_FIH_CHARM) || \
+     defined(CONFIG_FIH_ONYX) || \
+     defined(CONFIG_FIH_PLATE2)) && \
+    !defined(CONFIG_FIH_CRYSTAL) && \
+    !defined(CONFIG_FIH_TAISHAN)
+	chip->jeita_fcc_config->param.hysteresis = 6;
+#else
 	chip->jeita_fcc_config->param.hysteresis = 10;
+#endif
 	chip->jeita_fv_config->param.psy_prop = POWER_SUPPLY_PROP_TEMP;
 	chip->jeita_fv_config->param.prop_name = "BATT_TEMP";
+#if (defined(CONFIG_FIH_SDM630_SDM660_PROJS) || \
+     defined(CONFIG_FIH_CHARM) || \
+     defined(CONFIG_FIH_ONYX) || \
+     defined(CONFIG_FIH_PLATE2)) && \
+    !defined(CONFIG_FIH_CRYSTAL) && \
+    !defined(CONFIG_FIH_TAISHAN)
+	chip->jeita_fv_config->param.hysteresis = 6;
+#else
 	chip->jeita_fv_config->param.hysteresis = 10;
+#endif
 
 	INIT_DELAYED_WORK(&chip->status_change_work, status_change_work);
 	INIT_DELAYED_WORK(&chip->get_config_work, get_config_work);
