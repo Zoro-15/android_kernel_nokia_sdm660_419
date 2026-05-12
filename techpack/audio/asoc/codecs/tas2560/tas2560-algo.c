@@ -1,5 +1,5 @@
-#include <sound/smart_amp.h>
-#include <sound/q6afe-v2.h>
+#include <dsp/smart_amp.h>
+#include <dsp/q6afe-v2.h>
 #include <tas2560-calib.h>
 
 /*Master Control to Bypass the Smartamp TI CAPIv2 module*/
@@ -511,19 +511,19 @@ static const struct snd_kcontrol_new smartamp_tas2560_mixer_controls[] = {
 		tas2560_get_smartamp_status, NULL),
 };
 
-void codec_smartamp_add_controls(struct snd_soc_codec *codec)
+void codec_smartamp_add_controls(struct snd_soc_component *component)
 {
 	pr_err("TI-SmartPA: %s: Adding smartamp controls", __func__);
 	mutex_init(&routing_lock);
-	snd_soc_add_codec_controls(codec, smartamp_tas2560_mixer_controls,
+	snd_soc_add_component_controls(component, smartamp_tas2560_mixer_controls,
                                 ARRAY_SIZE(smartamp_tas2560_mixer_controls));
 	tas_calib_init();
 	
 }
 
-void codec_smartamp_remove_controls(struct snd_soc_codec *codec)
+void codec_smartamp_remove_controls(struct snd_soc_component *component)
 {
-	(void)codec;
+	(void)component;
 	tas_calib_exit();
 	//TODO: Mutex Deinit ??
 }

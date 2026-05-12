@@ -41,7 +41,7 @@
 #include <sound/soc.h>
 #include <sound/initval.h>
 #include <sound/tlv.h>
-#include <sound/smart_amp.h>
+#include <dsp/smart_amp.h>
 
 #ifdef dev_dbg
 #undef dev_dbg
@@ -55,9 +55,9 @@
 #define TAS2560_MDELAY 0xFFFFFFFE
 #define KCONTROL_CODEC
 
-static unsigned int tas2560_codec_read(struct snd_soc_codec *codec,  unsigned int reg)
+static unsigned int tas2560_codec_read(struct snd_soc_component *component,  unsigned int reg)
 {
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 	unsigned int value = 0;
 	int ret;
 
@@ -68,17 +68,17 @@ static unsigned int tas2560_codec_read(struct snd_soc_codec *codec,  unsigned in
 		return ret;
 }
 
-static int tas2560_codec_write(struct snd_soc_codec *codec, unsigned int reg,
+static int tas2560_codec_write(struct snd_soc_component *component, unsigned int reg,
 	unsigned int value)
 {
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	return pTAS2560->write(pTAS2560, reg, value);
 }
 
-static int tas2560_codec_suspend(struct snd_soc_codec *codec)
+static int tas2560_codec_suspend(struct snd_soc_component *component)
 {
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
 	mutex_lock(&pTAS2560->codec_lock);
@@ -90,9 +90,9 @@ static int tas2560_codec_suspend(struct snd_soc_codec *codec)
 	return ret;
 }
 
-static int tas2560_codec_resume(struct snd_soc_codec *codec)
+static int tas2560_codec_resume(struct snd_soc_component *component)
 {
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
 	mutex_lock(&pTAS2560->codec_lock);
@@ -107,9 +107,9 @@ static int tas2560_codec_resume(struct snd_soc_codec *codec)
 static int tas2560_AIF_post_event(struct snd_soc_dapm_widget *w,
 			struct snd_kcontrol *kcontrol, int event)
 {
-	struct snd_soc_codec *codec = snd_soc_dapm_to_codec(w->dapm); //rita change for old kernel
-	//struct snd_soc_codec *codec = w->codec; //for new kernel
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm); //rita change for old kernel
+	//struct snd_soc_component *component = w->component; //for new kernel
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
@@ -142,8 +142,8 @@ static const struct snd_soc_dapm_route tas2560_audio_map[] = {
 static int tas2560_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = dai->component;
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	dev_dbg(pTAS2560->dev, "%s\n", __func__);
 
@@ -153,16 +153,16 @@ static int tas2560_startup(struct snd_pcm_substream *substream,
 static void tas2560_shutdown(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = dai->component;
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	dev_dbg(pTAS2560->dev, "%s\n", __func__);
 }
 
 static int tas2560_mute(struct snd_soc_dai *dai, int mute)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = dai->component;
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	mutex_lock(&pTAS2560->codec_lock);
 	dev_dbg(pTAS2560->dev, "%s, %d\n", __func__, mute);
@@ -174,8 +174,8 @@ static int tas2560_mute(struct snd_soc_dai *dai, int mute)
 static int tas2560_set_dai_sysclk(struct snd_soc_dai *dai, int clk_id,
 			unsigned int freq, int dir)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = dai->component;
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
 	dev_dbg(pTAS2560->dev, "%s\n", __func__);
@@ -187,8 +187,8 @@ static int tas2560_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params,
 		struct snd_soc_dai *dai)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = dai->component;
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	dev_dbg(pTAS2560->dev, "%s\n", __func__);
 
@@ -198,8 +198,8 @@ static int tas2560_hw_params(struct snd_pcm_substream *substream,
 static int tas2560_prepare(struct snd_pcm_substream *substream,
 		struct snd_soc_dai *dai)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = dai->component;
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	dev_dbg(pTAS2560->dev, "%s\n", __func__);
 
@@ -208,8 +208,8 @@ static int tas2560_prepare(struct snd_pcm_substream *substream,
 
 static int tas2560_set_dai_fmt(struct snd_soc_dai *dai, unsigned int fmt)
 {
-	struct snd_soc_codec *codec = dai->codec;
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct snd_soc_component *component = dai->component;
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
 	dev_dbg(pTAS2560->dev, "%s, format=0x%x\n", __func__, fmt);
@@ -245,36 +245,39 @@ static struct snd_soc_dai_driver tas2560_dai_driver[] = {
 	},
 };
 
-static int tas2560_codec_probe(struct snd_soc_codec *codec)
+static int tas2560_codec_probe(struct snd_soc_component *component)
 {
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 /*FIH-Nokia Added for smartamp PP:060356*/
 #ifdef SMART_AMP
-	codec_smartamp_add_controls(codec);
+	codec_smartamp_add_controls(component);
 #endif	
 	dev_dbg(pTAS2560->dev, "%s\n", __func__);
 
 	return 0;
 }
 
-static int tas2560_codec_remove(struct snd_soc_codec *codec)
+static void tas2560_codec_remove(struct snd_soc_component *component)
 {
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 /*FIH-Nokia Added for smartamp PP:060356*/
 #ifdef SMART_AMP	
-	codec_smartamp_remove_controls(codec);
-#endif	
-	return 0;
+	codec_smartamp_remove_controls(component);
+#endif
+	dev_dbg(pTAS2560->dev, "%s\n", __func__);
+
+	return;
 }
 
 static int tas2560_get_load(struct snd_kcontrol *pKcontrol,
 			struct snd_ctl_elem_value *pUcontrol)
 {
 #ifdef KCONTROL_CODEC
-	struct snd_soc_codec *pCodec = snd_soc_kcontrol_codec(pKcontrol);
+	struct snd_soc_component *pCodec = snd_soc_kcontrol_component(pKcontrol);
 #else
-	struct snd_soc_codec *pCodec = snd_kcontrol_chip(pKcontrol);
+	struct snd_soc_component *pCodec = snd_kcontrol_chip(pKcontrol);
 #endif
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(pCodec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(pCodec);
 
 	pUcontrol->value.integer.value[0] = pTAS2560->mnLoad;
 
@@ -285,11 +288,11 @@ static int tas2560_set_load(struct snd_kcontrol *pKcontrol,
 			struct snd_ctl_elem_value *pUcontrol)
 {
 #ifdef KCONTROL_CODEC
-	struct snd_soc_codec *pCodec = snd_soc_kcontrol_codec(pKcontrol);
+	struct snd_soc_component *pCodec = snd_soc_kcontrol_component(pKcontrol);
 #else
-	struct snd_soc_codec *pCodec = snd_kcontrol_chip(pKcontrol);
+	struct snd_soc_component *pCodec = snd_kcontrol_chip(pKcontrol);
 #endif
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(pCodec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(pCodec);
 
 	mutex_lock(&pTAS2560->codec_lock);
 	pTAS2560->mnLoad = pUcontrol->value.integer.value[0];
@@ -304,11 +307,11 @@ static int tas2560_get_Sampling_Rate(struct snd_kcontrol *pKcontrol,
 				struct snd_ctl_elem_value *pUcontrol)
 {
 #ifdef KCONTROL_CODEC
-	struct snd_soc_codec *pCodec = snd_soc_kcontrol_codec(pKcontrol);
+	struct snd_soc_component *pCodec = snd_soc_kcontrol_component(pKcontrol);
 #else
-	struct snd_soc_codec *pCodec = snd_kcontrol_chip(pKcontrol);
+	struct snd_soc_component *pCodec = snd_kcontrol_chip(pKcontrol);
 #endif
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(pCodec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(pCodec);
 
 	pUcontrol->value.integer.value[0] = pTAS2560->mnSamplingRate;
 	dev_dbg(pCodec->dev, "%s: %d\n", __func__,
@@ -320,11 +323,11 @@ static int tas2560_set_Sampling_Rate(struct snd_kcontrol *pKcontrol,
 				struct snd_ctl_elem_value *pUcontrol)
 {
 #ifdef KCONTROL_CODEC
-	struct snd_soc_codec *pCodec = snd_soc_kcontrol_codec(pKcontrol);
+	struct snd_soc_component *pCodec = snd_soc_kcontrol_component(pKcontrol);
 #else
-	struct snd_soc_codec *pCodec = snd_kcontrol_chip(pKcontrol);
+	struct snd_soc_component *pCodec = snd_kcontrol_chip(pKcontrol);
 #endif
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(pCodec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(pCodec);
 	int sampleRate = pUcontrol->value.integer.value[0];
 
 	mutex_lock(&pTAS2560->codec_lock);
@@ -339,14 +342,14 @@ static int tas2560_power_ctrl_get(struct snd_kcontrol *pKcontrol,
 				struct snd_ctl_elem_value *pValue)
 {
 #ifdef KCONTROL_CODEC
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+	struct snd_soc_component *component = snd_soc_kcontrol_component(pKcontrol);
 #else
-	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(pKcontrol);
 #endif
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 
 	pValue->value.integer.value[0] = pTAS2560->mbPowerUp;
-	dev_dbg(codec->dev, "tas2560_power_ctrl_get = 0x%x\n",
+	dev_dbg(component->dev, "tas2560_power_ctrl_get = 0x%x\n",
 					pTAS2560->mbPowerUp);
 
 	return 0;
@@ -356,11 +359,11 @@ static int tas2560_power_ctrl_put(struct snd_kcontrol *pKcontrol,
 				struct snd_ctl_elem_value *pValue)
 {
 #ifdef KCONTROL_CODEC
-	struct snd_soc_codec *codec = snd_soc_kcontrol_codec(pKcontrol);
+	struct snd_soc_component *component = snd_soc_kcontrol_component(pKcontrol);
 #else
-	struct snd_soc_codec *codec = snd_kcontrol_chip(pKcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(pKcontrol);
 #endif
-	struct tas2560_priv *pTAS2560 = snd_soc_codec_get_drvdata(codec);
+	struct tas2560_priv *pTAS2560 = snd_soc_component_get_drvdata(component);
 	int bPowerUp = pValue->value.integer.value[0];
 
 	mutex_lock(&pTAS2560->codec_lock);
@@ -398,21 +401,19 @@ static const struct snd_kcontrol_new tas2560_snd_controls[] = {
 			tas2560_power_ctrl_get, tas2560_power_ctrl_put),
 };
 
-static struct snd_soc_codec_driver soc_codec_driver_tas2560 = {
+static struct snd_soc_component_driver soc_component_driver_tas2560 = {
 	.probe			= tas2560_codec_probe,
 	.remove			= tas2560_codec_remove,
 	.read			= tas2560_codec_read,
 	.write			= tas2560_codec_write,
 	.suspend		= tas2560_codec_suspend,
 	.resume			= tas2560_codec_resume,
-	.component_driver = {
-		.controls		= tas2560_snd_controls,
-		.num_controls		= ARRAY_SIZE(tas2560_snd_controls),
-		.dapm_widgets		= tas2560_dapm_widgets,
-		.num_dapm_widgets	= ARRAY_SIZE(tas2560_dapm_widgets),
-		.dapm_routes		= tas2560_audio_map,
-		.num_dapm_routes	= ARRAY_SIZE(tas2560_audio_map),
-	},
+	.controls		= tas2560_snd_controls,
+	.num_controls		= ARRAY_SIZE(tas2560_snd_controls),
+	.dapm_widgets		= tas2560_dapm_widgets,
+	.num_dapm_widgets	= ARRAY_SIZE(tas2560_dapm_widgets),
+	.dapm_routes		= tas2560_audio_map,
+	.num_dapm_routes	= ARRAY_SIZE(tas2560_audio_map),
 };
 
 int tas2560_register_codec(struct tas2560_priv *pTAS2560)
@@ -420,8 +421,8 @@ int tas2560_register_codec(struct tas2560_priv *pTAS2560)
 	int nResult = 0;
 
 	dev_info(pTAS2560->dev, "%s, enter\n", __func__);
-	nResult = snd_soc_register_codec(pTAS2560->dev,
-		&soc_codec_driver_tas2560,
+	nResult = snd_soc_register_component(pTAS2560->dev,
+		&soc_component_driver_tas2560,
 		tas2560_dai_driver, ARRAY_SIZE(tas2560_dai_driver));
 
 	return nResult;
@@ -429,7 +430,7 @@ int tas2560_register_codec(struct tas2560_priv *pTAS2560)
 
 int tas2560_deregister_codec(struct tas2560_priv *pTAS2560)
 {
-	snd_soc_unregister_codec(pTAS2560->dev);
+	snd_soc_unregister_component(pTAS2560->dev);
 
 	return 0;
 }
