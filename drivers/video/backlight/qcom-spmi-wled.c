@@ -265,6 +265,9 @@ struct wled {
 	enum wled_flash_mode flash_mode;
 	u8 num_strings;
 	u32 leds_per_string;
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	u16			prev_level;
+#endif
 };
 
 enum wled5_mod_sel {
@@ -505,6 +508,80 @@ static int wled_set_brightness(struct wled *wled, u16 brightness)
 	return 0;
 }
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+static int qpnp_wled_set_step_level_delay(struct wled *wled, int new_level)
+{
+	int rc, i, num_steps, delay_us;
+	u16 level, step_size;
+	bool level_inc = false;
+
+	level = wled->prev_level;
+	level_inc = (new_level > level);
+
+	num_steps = abs(level - new_level);
+	if (!num_steps)
+		return 0;
+
+	/* on qpnp_wled;
+	 * qpnp_wled_step_delay_us = 52000
+	 * qpnp_wled_step_size_threshold = 3
+	 * qpnp_wled_step_delay_gain = 2;
+	 */
+	delay_us = 52000 / num_steps;
+
+	if (delay_us < 500) {
+		step_size = 1000 / delay_us;
+		num_steps = num_steps / step_size;
+		delay_us = 1000;
+	} else {
+		if (num_steps < 3)
+			delay_us *= 2;
+
+		step_size = 1;
+	}
+
+	i = level;
+	while (num_steps--) {
+		if (level_inc)
+			i += step_size;
+		else
+			i -= step_size;
+
+		rc = wled_set_brightness(wled, i);
+		if (rc < 0)
+			return rc;
+
+		rc = wled_sync_toggle(wled); //qpnp_wled_set_level called qpnp_wled_sync_reg_toggle
+		if (rc < 0) {
+			pr_err("wled sync failed rc:%d\n", rc);
+			return rc;
+		}
+
+		if (delay_us > 0) {
+			if (delay_us < 20000)
+				usleep_range(delay_us, delay_us + 1);
+			else
+				msleep(delay_us / USEC_PER_MSEC);
+		}
+	}
+
+	if (i != new_level) {
+		i = new_level;
+		rc = wled_set_brightness(wled, i);
+		if (rc < 0)
+			return rc;
+
+	rc = wled_sync_toggle(wled); //qpnp_wled_set_level called qpnp_wled_sync_reg_toggle
+	if (rc < 0) {
+		pr_err("wled sync failed rc:%d\n", rc);
+		return rc;
+		}
+	}
+
+	return 0;
+}
+#endif
+
 static int wled_update_status(struct backlight_device *bl)
 {
 	struct wled *wled = bl_get_data(bl);
@@ -518,6 +595,11 @@ static int wled_update_status(struct backlight_device *bl)
 
 	mutex_lock(&wled->lock);
 	if (brightness) {
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+		if (wled->cfg.stepper_en && wled->prev_level != 0)
+			rc = qpnp_wled_set_step_level_delay(wled, brightness);
+		else
+#endif
 		rc = wled_set_brightness(wled, brightness);
 		if (rc < 0) {
 			pr_err("wled failed to set brightness rc:%d\n", rc);
@@ -557,6 +639,9 @@ static int wled_update_status(struct backlight_device *bl)
 		}
 	}
 
+#if defined(CONFIG_LONGCHEER_SDM660_PROJS)
+	wled->prev_level = brightness;
+#endif
 	wled->prev_state = !!brightness;
 
 	if (is_wled4(wled)) {
