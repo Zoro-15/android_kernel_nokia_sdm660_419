@@ -565,7 +565,8 @@ static ssize_t capsense_reset_store(struct class *class,
 	return count;
 }
 
-static CLASS_ATTR(reset, 0660, capsense_reset_show, capsense_reset_store);
+static struct class_attribute class_attr_reset =
+	__ATTR(reset, 0660, capsense_reset_show, capsense_reset_store);
 
 static ssize_t capsense_enable_show(struct class *class,
 		struct class_attribute *attr,
@@ -646,7 +647,8 @@ static ssize_t capsense_enable_store(struct class *class,
 	return count;
 }
 
-static CLASS_ATTR(enable, 0660, capsense_enable_show, capsense_enable_store);
+static struct class_attribute class_attr_enable =
+	__ATTR(enable, 0660, capsense_enable_show, capsense_enable_store);
 
 static ssize_t sarsense_enable_show(struct class *class,
     struct class_attribute *attr,char *buf)
@@ -667,7 +669,8 @@ static ssize_t sarsense_enable_store(struct class *class,
     }
     return count;
 }
-static CLASS_ATTR(capenable, 0660, sarsense_enable_show, sarsense_enable_store);
+static struct class_attribute class_attr_capenable =
+	__ATTR(capenable, 0660, sarsense_enable_show, sarsense_enable_store);
 static ssize_t reg_dump_show(struct class *class,
 		struct class_attribute *attr,
 		char *buf)
@@ -716,7 +719,8 @@ static ssize_t reg_dump_store(struct class *class,
 	return count;
 }
 
-static CLASS_ATTR(reg, 0660, reg_dump_show, reg_dump_store);
+static struct class_attribute class_attr_reg =
+	__ATTR(reg, 0660, reg_dump_show, reg_dump_store);
 
 static struct class capsense_class = {
 	.name			= "capsense",
@@ -1114,7 +1118,8 @@ static ssize_t capsense_update_fw_store(struct class *class,
 
 	return count;
 }
-static CLASS_ATTR(update_fw, 0660, capsense_fw_ver_show, capsense_update_fw_store);
+static struct class_attribute class_attr_update_fw =
+	__ATTR(update_fw, 0660, capsense_fw_ver_show, capsense_update_fw_store);
 
 static ssize_t capsense_force_update_fw_store(struct class *class,
 		struct class_attribute *attr,
@@ -1147,7 +1152,8 @@ static ssize_t capsense_force_update_fw_store(struct class *class,
 
 	return count;
 }
-static CLASS_ATTR(force_update_fw, 0660, capsense_fw_ver_show, capsense_force_update_fw_store);
+static struct class_attribute class_attr_force_update_fw =
+	__ATTR(force_update_fw, 0660, capsense_fw_ver_show, capsense_force_update_fw_store);
 
 static void capsense_update_work(struct work_struct *work)
 {
