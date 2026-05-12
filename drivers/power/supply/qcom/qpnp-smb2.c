@@ -547,10 +547,6 @@ static int smb2_parse_dt(struct smb2 *chip)
 	struct smb_charger *chg = &chip->chg;
 	struct device_node *node = chg->dev->of_node;
 	int rc, byte_len;
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
-	int fih_cfg[MAX_STEP_CHG_ENTRIES];
-	int cfg_len =0, hysteresis =0;
-#endif
 
 	if (!node) {
 		pr_err("device tree node missing\n");
@@ -748,63 +744,6 @@ static int smb2_parse_dt(struct smb2 *chip)
 	}
 	else
 		chg->fih_force_change_icl =0;
-
-//add for C1N/B2N sw settings {
-	if(chg->step_chg_enabled == true) {
-		if (of_find_property(node, "qcom,step-fcc-cfg", &byte_len)) {
-			cfg_len = byte_len / sizeof(u32);
-			rc = of_property_read_u32_array(node,
-					"qcom,step-fcc-cfg", fih_cfg, cfg_len);
-			if (rc < 0) {
-				dev_err(chg->dev,
-					"Couldn't read qcom,step-fcc-cfg rc = %d\n", rc);
-				return rc;
-			}
-			fih_set_step_chg_cfg(fih_cfg, cfg_len/3, STEP_CHG_CFG);
-		}
-
-		if(of_find_property(node, "qcom,step-fcc-hysteresis", NULL))
-		{
-			rc = of_property_read_u32(node,
-				"qcom,step-fcc-hysteresis",	&hysteresis);
-			fih_set_step_chg_hysteresis(hysteresis, STEP_CHG_CFG);
-		}
-	}
-
-	if(chg->sw_jeita_enabled == true) {
-		byte_len =0;
-		if (of_find_property(node, "qcom,jeita-fcc-cfg", &byte_len)) {
-			cfg_len = byte_len / sizeof(u32);
-			rc = of_property_read_u32_array(node,
-				"qcom,jeita-fcc-cfg", fih_cfg, cfg_len);
-			if (rc < 0) {
-				dev_err(chg->dev,
-					"Couldn't read qcom,jeita-fcc-cfg rc = %d\n", rc);
-				return rc;
-			}
-			fih_set_step_chg_cfg(fih_cfg, cfg_len/3, JEITA_FCC_CFG);
-		}
-		byte_len =0;
-		if (of_find_property(node, "qcom,jeita-fv-cfg", &byte_len)) {
-			cfg_len = byte_len / sizeof(u32);
-			rc = of_property_read_u32_array(node,
-					"qcom,jeita-fv-cfg", fih_cfg, cfg_len);
-			if (rc < 0) {
-				dev_err(chg->dev,
-					"Couldn't read qcom,jeita-fv-cfg rc = %d\n", rc);
-				return rc;
-			}
-			fih_set_step_chg_cfg(fih_cfg, cfg_len/3, JEITA_FV_CFG);
-		}
-		if(of_find_property(node, "qcom,jeita-fcc-fv-hysteresis", NULL))
-		{
-			rc = of_property_read_u32(node,
-				"qcom,jeita-fcc-fv-hysteresis",	&hysteresis);
-			fih_set_step_chg_hysteresis(hysteresis, JEITA_FCC_CFG);
-			fih_set_step_chg_hysteresis(hysteresis, JEITA_FV_CFG);
-		}
-	}
-//add for C1N/B2N sw settings }
 
 // add for Sharp 1.5A QC
 	if(of_find_property(node, "qcom,hvdcp-usb-icl-ua", NULL))
