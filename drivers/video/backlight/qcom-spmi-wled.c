@@ -24,6 +24,9 @@
 #include <linux/qpnp/qpnp-revid.h>
 #include <linux/leds-qpnp-flash.h>
 #include "../../leds/leds.h"
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#include <linux/gpio.h>
+#endif
 
 /* General definitions */
 #define WLED_DEFAULT_BRIGHTNESS		2048
@@ -347,6 +350,9 @@ static int wled_module_enable(struct wled *wled, int val)
 			wled->ovp_irq_disabled = false;
 		}
 	} else {
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+		usleep_range(5000,6000); //FIH, Delay for disable
+#endif
 		if (wled->ovp_irq > 0 && !wled->ovp_irq_disabled) {
 			disable_irq(wled->ovp_irq);
 			wled->ovp_irq_disabled = true;
@@ -2338,6 +2344,9 @@ static const struct backlight_ops wled_ops = {
 	.get_brightness = wled_get_brightness,
 };
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+int g_wled_fs_curr_ua = 0;	//SW4-HL-Display-HDR-SetFsCurr-00+_20180515
+#endif
 static int wled_probe(struct platform_device *pdev)
 {
 	struct backlight_properties props;
@@ -2400,6 +2409,19 @@ static int wled_probe(struct platform_device *pdev)
 		wled->cfg.fs_current > 8)
 		wled->cfg.fs_current = 8;
 
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+	if (is_wled4(wled)) {
+		//ZZDC sunqiupeng modify for set led current@20180126 start
+		if(strstr(saved_command_line, "androidboot.device=PL2") != NULL && gpio_get_value(12) != 0){
+			//It is PL2 HLT panel,set max led current as 15ma
+			wled->cfg.fs_current = 6; //15000
+		}
+		//ZZDC sunqiupeng modify for set led current@20180126 end
+	}
+	g_wled_fs_curr_ua = wled->cfg.fs_current * 2500; //every current value is 2500apart so multiply
+	//SW4-HL-Display-HDR-SetFsCurr-00+_20180515
+#endif
+
 	if (is_wled4(wled))
 		rc = wled4_setup(wled);
 	else
@@ -2435,6 +2457,9 @@ static int wled_probe(struct platform_device *pdev)
 
 	return rc;
 }
+#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+EXPORT_SYMBOL(g_wled_fs_curr_ua);	//SW4-HL-Display-HDR-SetFsCurr-00+_20180515
+#endif
 
 static const struct of_device_id wled_match_table[] = {
 	{ .compatible = "qcom,pmi8998-spmi-wled", .data = &version_table[0] },
