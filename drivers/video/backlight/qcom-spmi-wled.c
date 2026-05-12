@@ -219,6 +219,7 @@ struct wled_config {
 	bool disp_type_amoled;
 	bool ext_pfet_sc_pro_en;
 	bool auto_calib_enabled;
+	bool stepper_en;
 };
 
 struct wled_flash_config {
@@ -1397,6 +1398,7 @@ static const struct wled_config wled4_config_defaults = {
 	.disp_type_amoled = 0,
 	.ext_pfet_sc_pro_en = 0,
 	.auto_calib_enabled = 0,
+	.stepper_en = 0,
 };
 
 static const struct wled_config wled5_config_defaults = {
@@ -1411,6 +1413,7 @@ static const struct wled_config wled5_config_defaults = {
 	.disp_type_amoled = 0,
 	.ext_pfet_sc_pro_en = 0,
 	.auto_calib_enabled = 0,
+	.stepper_en = 0,
 };
 
 struct wled_var_cfg {
@@ -2282,6 +2285,7 @@ static int wled_configure(struct wled *wled, struct device *dev)
 		{ "qcom,disp-type-amoled", &cfg->disp_type_amoled, },
 		{ "qcom,ext-pfet-sc-pro", &cfg->ext_pfet_sc_pro_en, },
 		{ "qcom,auto-calibration", &cfg->auto_calib_enabled, },
+		{ "qcom,wled-stepper-en", &cfg->stepper_en, }
 	};
 
 	prop_addr = of_get_address(dev->of_node, 0, NULL, NULL);
