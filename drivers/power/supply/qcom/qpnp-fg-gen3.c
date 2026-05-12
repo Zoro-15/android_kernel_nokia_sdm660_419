@@ -2481,7 +2481,7 @@ static void fg_esr_sw_work(struct work_struct *work)
 	union power_supply_propval pval = {0, };
 	int rc, esr_uohms = 0;
 
-	vote(fg->awake_votable, FG_ESR_VOTER, true, 0);
+	vote(fg->awake_votable, QPNP_FG_ESR_VOTER, true, 0);
 	/*
 	 * Enable ESR extraction just before we reduce the FCC
 	 * to make sure that FG extracts the ESR. Disable ESR
@@ -2536,7 +2536,7 @@ done:
 		pr_err("Failed to disable ESR extraction rc=%d\n", rc);
 
 
-	vote(fg->awake_votable, FG_ESR_VOTER, false, 0);
+	vote(fg->awake_votable, QPNP_FG_ESR_VOTER, false, 0);
 	fg_relax(fg, FG_SW_ESR_WAKE);
 }
 
