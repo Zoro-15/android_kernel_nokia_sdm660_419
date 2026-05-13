@@ -227,6 +227,12 @@ Following properties are applicable only when "qcom,play-mode" is set to
   Value type: <u32>
   Definition: PWM duty cycle in us.
 
+- qcom,int-pwm-freq-khz
+  Usage:      optional
+  Value type: <u32>
+  Definition: Frequency for internal PWM in KHz.
+		Allowed values are: 253, 505, 739 and 1076.
+
 - qcom,ext-pwm-freq-khz
   Usage:      optional
   Value type: <u32>
