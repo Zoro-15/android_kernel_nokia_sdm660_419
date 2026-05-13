@@ -272,6 +272,7 @@ struct hap_lra_ares_param {
  *  @ vmax_mv - max voltage in mv
  *  @ ilim_ma - limiting current in ma
  *  @ sc_deb_cycles - short circuit debounce cycles
+ *  @ int_pwm_freq_khz - internal pwm frequency in khz
  *  @ wave_play_rate_us - play rate for waveform
  *  @ last_rate_cfg - Last rate config updated
  *  @ wave_rep_cnt - waveform repeat count
@@ -329,6 +330,7 @@ struct hap_chip {
 	u32				vmax_mv;
 	u8				ilim_ma;
 	u32				sc_deb_cycles;
+	u32				int_pwm_freq_khz;
 	u32				wave_play_rate_us;
 	u16				last_rate_cfg;
 	u32				wave_rep_cnt;
@@ -1168,6 +1170,40 @@ static int qpnp_haptics_sc_deb_config(struct hap_chip *chip)
 	return rc;
 }
 
+static int qpnp_hap_int_pwm_config(struct hap_chip *chip)
+{
+	int rc;
+	u8 val;
+
+	if (chip->int_pwm_freq_khz <= INT_PWM_FREQ_253_KHZ) {
+		if (chip->revid->pmic_subtype == PM660_SUBTYPE) {
+			chip->int_pwm_freq_khz = INT_PWM_FREQ_505_KHZ;
+			val = 1;
+		} else {
+			chip->int_pwm_freq_khz = INT_PWM_FREQ_253_KHZ;
+			val = 0;
+		}
+	} else if (chip->int_pwm_freq_khz <= INT_PWM_FREQ_505_KHZ) {
+		chip->int_pwm_freq_khz = INT_PWM_FREQ_505_KHZ;
+		val = 1;
+	} else if (chip->int_pwm_freq_khz <= INT_PWM_FREQ_739_KHZ) {
+		chip->int_pwm_freq_khz = INT_PWM_FREQ_739_KHZ;
+		val = 2;
+	} else {
+		chip->int_pwm_freq_khz = INT_PWM_FREQ_1076_KHZ;
+		val = 3;
+	}
+
+	rc = qpnp_haptics_masked_write_reg(chip, HAP_INT_PWM_REG(chip),
+			INT_PWM_FREQ_SEL_MASK, val);
+	if (rc)
+		return rc;
+
+	rc = qpnp_haptics_masked_write_reg(chip, HAP_PWM_CAP_REG(chip),
+			INT_PWM_FREQ_SEL_MASK, val);
+	return rc;
+}
+
 static int qpnp_haptics_brake_config(struct hap_chip *chip, u32 *brake_pat)
 {
 	int rc, i;
@@ -1867,6 +1903,11 @@ static int qpnp_haptics_config(struct hap_chip *chip)
 	if (rc < 0)
 		return rc;
 
+	/* Configure the INTERNAL_PWM register */
+	rc = qpnp_hap_int_pwm_config(chip);
+	if (rc)
+		return rc;
+
 	/* Configure the WAVE SHAPE register */
 	rc = qpnp_haptics_masked_write_reg(chip, HAP_CFG2_REG(chip),
 			HAP_LRA_RES_TYPE_MASK, chip->wave_shape);
@@ -2216,6 +2257,15 @@ static int qpnp_haptics_parse_dt(struct hap_chip *chip)
 		chip->sc_deb_cycles = temp;
 	} else if (rc != -EINVAL) {
 		pr_err("Unable to read sc debounce rc=%d\n", rc);
+		return rc;
+	}
+
+	chip->int_pwm_freq_khz = INT_PWM_FREQ_505_KHZ;
+	rc = of_property_read_u32(node, "qcom,int-pwm-freq-khz", &temp);
+	if (!rc) {
+		chip->int_pwm_freq_khz = temp;
+	} else if (rc != -EINVAL) {
+		pr_err("Unable to read int pwm freq\n");
 		return rc;
 	}
 
