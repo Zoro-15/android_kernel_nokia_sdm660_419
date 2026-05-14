@@ -17,7 +17,7 @@
 #include <linux/mutex.h>
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/gpio.h>
 
 #include <my_mv4d_projector_ioctl.h>
