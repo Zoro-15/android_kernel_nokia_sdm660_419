@@ -379,6 +379,10 @@ static int wled_sync_toggle(struct wled *wled)
 	if (rc < 0)
 		return rc;
 
+#if defined(CONFIG_LONGCHEER_STARLORD) || defined(CONFIG_LONGCHEER_DAREDEVIL)
+	usleep_range(4000, 4001);
+#endif
+
 	return regmap_update_bits(wled->regmap,
 			wled->sink_addr + WLED_SINK_SYNC,
 			WLED_SINK_SYNC_MASK, WLED_SINK_SYNC_MASK);
