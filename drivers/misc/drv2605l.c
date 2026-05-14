@@ -61,31 +61,6 @@ void vibrator_set_pattern_value(int value)
 	getPatternValue = value;
 }
 
-/* sysfs store function for ramp step */
-static ssize_t qpnp_hap_pattern_store(struct device *dev,
-		struct device_attribute *attr, const char *buf, size_t count)
-{
-	int data, rc;
-	struct timed_output_dev *to_dev = dev_get_drvdata(dev);
-	struct drv2605L_data *pDrv2605Ldata = container_of(to_dev, struct drv2605L_data, to_dev);
-
-	rc = kstrtoint(buf, 10, &data);
-	if (rc)
-		return rc;
-
-	printk("qpnp_hap_pattern_store vibrator get pattern value is %d\n",data);
-	vibrator_set_pattern_value(data);
-
-	cancel_work_sync(&pDrv2605Ldata->vibrator_pattern_work);
-	schedule_work(&pDrv2605Ldata->vibrator_pattern_work);
-
-	return count;
-}
-
-static struct device_attribute qpnp_hap_attrs[] = {
-	__ATTR(pattern, 0664, NULL, qpnp_hap_pattern_store),
-};
-
 static int drv2605L_reg_read(struct drv2605L_data *pDrv2605Ldata, unsigned int reg)
 {
 	unsigned int val;
@@ -363,17 +338,6 @@ static void drv2605L_stop(struct drv2605L_data *pDrv2605Ldata)
 	}
 }
 
-static int vibrator_get_time(struct timed_output_dev *dev)
-{
-	struct drv2605L_data *pDrv2605Ldata = container_of(dev, struct drv2605L_data, to_dev);
-
-    if (hrtimer_active(&pDrv2605Ldata->timer)) {
-        ktime_t r = hrtimer_get_remaining(&pDrv2605Ldata->timer);
-        return ktime_to_ms(r);
-    }
-
-    return 0;
-}
 #define SIN_C_MASK
 #define ASIN_C_MASK
 #define DELAY_MASK
@@ -553,9 +517,9 @@ static void vibrator_set_normal_vibration_B2N(struct drv2605L_data *pDrv2605Ldat
 	drv2605L_reg_write(pDrv2605Ldata,0x17,0x5C);
 }
 
-static void vibrator_enable( struct timed_output_dev *dev, int value)
+static void vibrator_enable(struct led_classdev *cdev, int value)
 {
-	struct drv2605L_data *pDrv2605Ldata = container_of(dev, struct drv2605L_data, to_dev);
+	struct drv2605L_data *pDrv2605Ldata = container_of(cdev, struct drv2605L_data, led_dev);
 
 	pDrv2605Ldata->should_stop = YES;
 	hrtimer_cancel(&pDrv2605Ldata->timer);
@@ -596,14 +560,14 @@ static void vibrator_enable( struct timed_output_dev *dev, int value)
 	mutex_unlock(&pDrv2605Ldata->lock);
 }
 
-static void fih_vibrator_enable( struct timed_output_dev *dev, int value)
+static void fih_vibrator_enable(struct led_classdev *cdev, int value)
 {
 	//int wave_num;
 	//unsigned int SIN_C, delay_steps, ANTI_SIN_C, duty=0;
 	//printk(KERN_ERR"%s,value=%d \n", __FUNCTION__,value);
 
 	if(value>=0)
-		vibrator_enable(dev, value);
+		vibrator_enable(cdev, value);
         #if 0
 	if(value<0){
 		wave_num = -1*value;
@@ -625,6 +589,140 @@ static void fih_vibrator_enable( struct timed_output_dev *dev, int value)
 	}
         #endif
 }
+
+
+/* sysfs show function for ramp step */
+static ssize_t qpnp_hap_pattern_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	return snprintf(buf, PAGE_SIZE, "%d\n", getPatternValue);
+}
+
+/* sysfs store function for ramp step */
+static ssize_t qpnp_hap_pattern_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	int data, rc;
+	struct led_classdev *cdev = dev_get_drvdata(dev);
+	struct drv2605L_data *pDrv2605Ldata = container_of(cdev, struct drv2605L_data, led_dev);
+
+	rc = kstrtoint(buf, 10, &data);
+	if (rc)
+		return rc;
+
+	printk("qpnp_hap_pattern_store vibrator get pattern value is %d\n",data);
+	vibrator_set_pattern_value(data);
+
+	cancel_work_sync(&pDrv2605Ldata->vibrator_pattern_work);
+	schedule_work(&pDrv2605Ldata->vibrator_pattern_work);
+
+	return count;
+}
+
+static ssize_t drv2605l_show_state(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *cdev = dev_get_drvdata(dev);
+	struct drv2605L_data *pDrv2605Ldata = container_of(cdev, struct drv2605L_data, led_dev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", pDrv2605Ldata->vibrator_is_playing);
+}
+
+static ssize_t drv2605l_store_state(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	/* At present, nothing to do with setting state */
+	return count;
+}
+
+static ssize_t drv2605l_show_duration(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct led_classdev *cdev = dev_get_drvdata(dev);
+	struct drv2605L_data *pDrv2605Ldata = container_of(cdev, struct drv2605L_data, led_dev);
+	ktime_t time_rem;
+	s64 time_us = 0;
+
+	if (hrtimer_active(&pDrv2605Ldata->timer)) {
+		time_rem = hrtimer_get_remaining(&pDrv2605Ldata->timer);
+		time_us = ktime_to_us(time_rem);
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%lld\n", div_s64(time_us, 1000));
+}
+
+static ssize_t drv2605l_store_duration(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct led_classdev *cdev = dev_get_drvdata(dev);
+	struct drv2605L_data *pDrv2605Ldata = container_of(cdev, struct drv2605L_data, led_dev);
+	u32 val;
+	int rc;
+
+	rc = kstrtouint(buf, 0, &val);
+	if (rc < 0)
+		return rc;
+
+	/* setting 0 on duration is NOP for now */
+	if (val <= 0)
+		return count;
+
+	if (val > MAX_TIMEOUT)
+		val = MAX_TIMEOUT;
+
+	mutex_lock(&pDrv2605Ldata->lock);
+	pDrv2605Ldata->play_time_ms = val;
+	mutex_unlock(&pDrv2605Ldata->lock);
+
+	return count;
+}
+
+static ssize_t drv2605l_show_activate(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	/* NOP */
+	return snprintf(buf, PAGE_SIZE, "%d\n", 0);
+}
+
+static ssize_t drv2605l_store_activate(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct led_classdev *led_dev = dev_get_drvdata(dev);
+	struct drv2605L_data *pDrv2605Ldata = container_of(led_dev, struct drv2605L_data, led_dev);
+	u32 val;
+	int rc, time_ms = pDrv2605Ldata->play_time_ms;
+
+	rc = kstrtouint(buf, 0, &val);
+	if (rc < 0)
+		return rc;
+
+	if (val != 0 && val != 1)
+		return count;
+
+	/* fih_vibrator_enable -> vibrator_enable */
+	fih_vibrator_enable(&pDrv2605Ldata->led_dev, val ? time_ms : 0);
+
+	return count;
+}
+
+static struct device_attribute qpnp_hap_attrs[] = {
+	__ATTR(pattern, 0664, qpnp_hap_pattern_show, qpnp_hap_pattern_store),
+	__ATTR(state, 0664, drv2605l_show_state, drv2605l_store_state),
+	__ATTR(duration, 0664, drv2605l_show_duration, drv2605l_store_duration),
+	__ATTR(activate, 0664, drv2605l_show_activate, drv2605l_store_activate),
+};
+
+/* Dummy functions for brightness */
+static enum led_brightness drv2605l_brightness_get(struct led_classdev *cdev)
+{
+	return 0;
+}
+
+static void drv2605l_brightness_set(struct led_classdev *cdev,
+				    enum led_brightness level)
+{
+}
+
 static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)
 {
 	struct drv2605L_data *pDrv2605Ldata = container_of(timer, struct drv2605L_data, timer);
@@ -935,7 +1033,8 @@ void drv2605L_late_resume(struct early_suspend *h) {
 
 static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 {
-    int reval = -ENOMEM;
+	int reval = -ENOMEM;
+	int i = 0;
 
     pDrv2605Ldata->version = MKDEV(0,0);
     reval = alloc_chrdev_region(&pDrv2605Ldata->version, 0, 1, HAPTICS_DEVICE_NAME);
@@ -976,24 +1075,24 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 		goto fail4;
 	}
 
-	pDrv2605Ldata->to_dev.name = "vibrator";
-	pDrv2605Ldata->to_dev.get_time = vibrator_get_time;
-	pDrv2605Ldata->to_dev.enable = fih_vibrator_enable;//vibrator_enable;
+	pDrv2605Ldata->led_dev.name = "vibrator";
+	pDrv2605Ldata->led_dev.brightness_get = drv2605l_brightness_get;
+	pDrv2605Ldata->led_dev.brightness_set = drv2605l_brightness_set;
+	pDrv2605Ldata->led_dev.max_brightness = 100;
 
-    if (timed_output_dev_register(&(pDrv2605Ldata->to_dev)) < 0)
-    {
-        printk(KERN_ALERT"drv2605: fail to create timed output dev\n");
-        goto fail3;
-    }
-	if(pDrv2605Ldata->PlatData.support_pattern==true)
-	{
-		int i=0;
-		printk("support_pattern is true create virtual file\n");
-		for (i = 0; i < ARRAY_SIZE(qpnp_hap_attrs); i++)
-		{
-				int rc = sysfs_create_file(&(pDrv2605Ldata->to_dev).dev->kobj,&qpnp_hap_attrs[i].attr);
-				if (rc < 0)
-					pr_err("sysfs creation failed\n");
+	reval = devm_led_classdev_register(pDrv2605Ldata->device, &pDrv2605Ldata->led_dev);
+	if (reval < 0) {
+		pr_err("Error in registering led class device, reval=%d\n", reval);
+		goto fail4;
+	}
+
+	for (i = 0; i < ARRAY_SIZE(qpnp_hap_attrs); i++) {
+		reval = sysfs_create_file(&pDrv2605Ldata->led_dev.dev->kobj,
+						&qpnp_hap_attrs[i].attr);
+		if (reval < 0) {
+			dev_err(pDrv2605Ldata->device, "Error in creating sysfs file, ret=%d\n",
+				reval);
+			goto fail5;
 		}
 	}
 
@@ -1013,6 +1112,10 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 
     return 0;
 
+fail5:
+	for (--i; i >= 0; i--)
+		sysfs_remove_file(&pDrv2605Ldata->led_dev.dev->kobj,
+				&qpnp_hap_attrs[i].attr);
 fail4:
 	extcon_dev_unregister(&pDrv2605Ldata->sw_dev);
 fail3:
@@ -1165,8 +1268,6 @@ static int drv2605L_parse_dt(struct device *dev,
 	struct device_node *np = dev->of_node;
 	unsigned int use_enable, use_trigger;
 	int error;
-	int pattern_enable=0;
-
 
 	use_enable = of_property_read_bool(np, "ti,use-enable");
 
@@ -1281,15 +1382,6 @@ static int drv2605L_parse_dt(struct device *dev,
 	}
 
 	dev_err(dev, "%s: dts: a2h-max-output-vol=%d \n", __func__, pDrv2605Platdata->a2h.a2h_max_output);
-
-	pattern_enable = of_property_read_bool(np, "fih,enable-pattern");
-
-	if(pattern_enable)
-		pDrv2605Platdata->support_pattern = true;
-	else
-		pDrv2605Platdata->support_pattern = false;
-
-	printk("support pattern is %d\n",pDrv2605Platdata->support_pattern);
 
 	return error;
 }
