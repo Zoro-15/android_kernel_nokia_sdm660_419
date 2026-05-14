@@ -36,9 +36,6 @@
 #include <linux/hrtimer.h>
 #include <linux/mutex.h>
 #include <linux/cdev.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-#endif
 
 #define HAPTICS_DEVICE_NAME "drv2605L"
 
@@ -484,9 +481,6 @@ struct drv2605L_data {
     volatile int should_stop;
 	struct led_classdev led_dev;
 	int play_time_ms;
-#ifdef CONFIG_HAS_EARLYSUSPEND   
-    struct early_suspend    early_suspend;   
-#endif	
 };
 
 static void vibrator_pattern_enable_peek(struct drv2605L_data *pDrv2605Ldata);
