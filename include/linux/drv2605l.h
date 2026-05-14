@@ -32,7 +32,7 @@
 #include <linux/regmap.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
-#include <../../drivers/staging/android/timed_output.h>
+#include <linux/leds.h>
 #include <linux/hrtimer.h>
 #include <linux/mutex.h>
 #include <linux/cdev.h>
@@ -438,7 +438,6 @@ struct drv2605_platform_data {
 	enum BIDIR_Input BIDIRInput;
 	struct actuator_data actuator;
 	struct audio2haptics_data a2h;
-	bool support_pattern;
 };
 
 #define	MAX_RTP_SEQ		16
@@ -483,7 +482,8 @@ struct drv2605L_data {
     struct work_struct vibrator_pattern_work;
     unsigned char sequence[WAVEFORM_SEQUENCER_MAX];
     volatile int should_stop;
-	struct timed_output_dev to_dev;	
+	struct led_classdev led_dev;
+	int play_time_ms;
 #ifdef CONFIG_HAS_EARLYSUSPEND   
     struct early_suspend    early_suspend;   
 #endif	
