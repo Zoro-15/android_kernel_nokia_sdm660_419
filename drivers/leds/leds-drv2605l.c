@@ -999,38 +999,6 @@ static struct file_operations fops =
     .write = dev2605L_write,
 };
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
-void drv2605L_early_suspend(struct early_suspend *h){
-	struct drv2605L_data *pDrv2605Ldata = container_of(h, struct drv2605L_data, early_suspend);
-
-	pDrv2605Ldata->should_stop = YES;
-	hrtimer_cancel(&pDrv2605Ldata->timer);
-	cancel_work_sync(&pDrv2605Ldata->vibrator_work);
-
-	mutex_lock(&pDrv2605Ldata->lock);
-
-	drv2605L_stop(pDrv2605Ldata);
-	if(pDrv2605Ldata->audio_haptics_enabled == YES){
-		__pm_relax(pDrv2605Ldata->wklock);
-	}
-
-	mutex_unlock(&pDrv2605Ldata->lock);
-    return ;
-}
-
-void drv2605L_late_resume(struct early_suspend *h) {
-	struct drv2605L_data *pDrv2605Ldata = container_of(h, struct drv2605L_data, early_suspend);
-
-	mutex_lock(&pDrv2605Ldata->lock);
-	if(pDrv2605Ldata->audio_haptics_enabled == YES){
-		__pm_stay_awake(pDrv2605Ldata->wklock);
-		setAudioHapticsEnabled(pDrv2605Ldata, YES);
-	}
-	mutex_unlock(&pDrv2605Ldata->lock);
-    return ;
- }
- #endif
-
 static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 {
 	int reval = -ENOMEM;
@@ -1095,13 +1063,6 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 			goto fail5;
 		}
 	}
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-    pDrv2605Ldata->early_suspend.suspend = drv2605L_early_suspend;
-	pDrv2605Ldata->early_suspend.resume = drv2605L_late_resume;
-	pDrv2605Ldata->early_suspend.level = EARLY_SUSPEND_LEVEL_BLANK_SCREEN - 1;
-	register_early_suspend(&pDrv2605Ldata->early_suspend);
-#endif
 
     hrtimer_init(&pDrv2605Ldata->timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
     pDrv2605Ldata->timer.function = vibrator_timer_func;
@@ -1569,10 +1530,6 @@ static int drv2605L_remove(struct i2c_client* client)
 
 	if(pDrv2605Ldata->PlatData.GpioEnable)
 		gpio_free(pDrv2605Ldata->PlatData.GpioEnable);
-
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	unregister_early_suspend(&pDrv2605Ldata->early_suspend);
-#endif
 
     printk(KERN_ALERT"drv2605 remove");
 
