@@ -23,6 +23,33 @@
 			};
 		};
 	};
+	qcom,pm660@1 {
+		/delete-node/ qcom,haptic@c000;
+		pm660_haptics: qcom,haptics@c000 {
+			compatible = "qcom,qpnp-haptics";
+			reg = <0xc000 0x100>;
+			interrupts = <0x1 0xc0 0x0 IRQ_TYPE_EDGE_BOTH>,
+				     <0x1 0xc0 0x1 IRQ_TYPE_EDGE_BOTH>;
+			interrupt-names = "hap-sc-irq", "hap-play-irq";
+			qcom,pmic-revid = <&pm660_revid>;
+			qcom,pmic-misc = <&pm660_misc>;
+			qcom,misc-clk-trim-error-reg = <0xf3>;
+			qcom,actuator-type = <0>;
+			qcom,play-mode = "direct";
+			qcom,vmax-mv = <3200>;
+			qcom,ilim-ma = <800>;
+			qcom,wave-shape = "sine";
+			qcom,wave-play-rate-us = <4255>; //modified by wenhuilong @20190717 for vib
+			qcom,int-pwm-freq-khz = <1>;
+			qcom,sc-dbc-cycles = <8>;
+			qcom,en-brake;
+			qcom,brake-pattern = <0x3 0x3 0x0 0x0>;
+			qcom,lra-high-z = "opt0";
+			qcom,lra-auto-res-mode = "none"; //modified by wenhuilong @20190717 for vib
+			qcom,lra-calibrate-at-eop = <0>;
+			qcom,correct-lra-drive-freq;///check if needed
+		};
+	};
 };
 
 &pm660_charger {
@@ -46,12 +73,6 @@
     qcom,fg-sys-term-current = <300>;
 	/*set cutoff voltage and term current add by tangjifu 2019-03-19 end*/
 	qcom,fg-jeita-thresholds = <0 10 45 52>;
-};
-
-&pm660_haptics {
-	qcom,wave-shape = "sine";
-	qcom,wave-play-rate-us = <4255>; //modified by wenhuilong @20190717 for vib
-	qcom,lra-auto-res-mode = "none"; //modified by wenhuilong @20190717 for vib
 };
 
 &rpm_bus {
