@@ -17,7 +17,7 @@
 ** Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 **
 ** File:
-**     drv2605l.c
+**     leds-drv2605l.c
 **
 ** Description:
 **     DRV2605L chip driver
@@ -44,7 +44,7 @@
 #include <linux/err.h>
 #include <linux/clk.h>
 #include <linux/of_gpio.h>
-#include <linux/drv2605l.h>
+#include <linux/leds-drv2605l.h>
 
 static struct drv2605L_data *pDRV2605Ldata = NULL;
 
