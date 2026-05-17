@@ -81,3 +81,4 @@ obj-$(CONFIG_FPR_FPC)		+= fpr_FingerprintCard/
 obj-y                           += qrc/
 obj-$(CONFIG_KINECTICS_XR_NORDIC) += kxrctrl/
 obj-$(CONFIG_I2C_DEVINFO)	+= i2c_devinfo.o
+obj-$(CONFIG_POWERKEY_FORCECRASH)	+= powerkey_forcecrash.o
