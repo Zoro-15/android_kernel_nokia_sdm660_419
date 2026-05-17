@@ -674,3 +674,10 @@ config POWERKEY_FORCECRASH
 	help
 	  Say Y here if you want force crash functionality through power
 	  key. Triggers panic if power key is hold for more than 10secs.
+
+config POWERKEY_FORCECRASH_TIMEOUT
+	int "forcecrash timeout"
+	default 10
+	depends on POWERKEY_FORCECRASH
+	help
+	  timeout on power key press

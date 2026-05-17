@@ -14,7 +14,7 @@
 #include <linux/timer.h>
 #include <linux/pm_wakeup.h>
 
-#define FORCE_CRASH_TIMEOUT 10
+#define FORCE_CRASH_TIMEOUT CONFIG_POWERKEY_FORCECRASH_TIMEOUT
 static struct timer_list forcecrash_timer;
 
 #define PKEY_FORCECRASH_DEV_NAME "powerkey_forcecrash"
