@@ -82,7 +82,7 @@
 /* Timeout value for MBA boot when minidump is enabled */
 #define MBA_ENCRYPTION_TIMEOUT	3000
 
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#if 1
 /* -------------------------------------------------------- */
 #define FIH_RAM_BASE					0xAC000000
 /* modem rf_nv */
@@ -679,7 +679,7 @@ int pil_mss_reset_load_mba(struct pil_desc *pil)
 	struct device *dma_dev = md->mba_mem_dev_fixed ?: &md->mba_mem_dev;
 
 	trace_pil_func(__func__);
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
+#if  1
 	pr_err("%s: %s\n", __func__, pil->name);
 	if (!(strncmp(pil->name, "modem", sizeof(char)*5))) {
 		if (!fih_nv_assigned) {
