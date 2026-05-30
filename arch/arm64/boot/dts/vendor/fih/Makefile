@@ -32,11 +32,12 @@ dtb-$(CONFIG_FIH_ONYX) += sdm636-mtp-b2n-preEVT.dtb \
 		sdm660-mtp-b2n-DVT-QC.dtb \
 		sdm660-mtp-b2n-DVT-TI.dtb
 
-dtb-$(CONFIG_FIH_PLATE2) += sdm630-mtp-pl2-preEVT.dtb \
-		sdm630-mtp-pl2-EVT1.5.dtb \
-		sdm630-mtp-pl2-EVT1.5-CD.dtb \
-		sdm630-mtp-pl2-dvt.dtb \
-		sdm660-mtp-pl2-preEVT.dtb
+# dtb-$(CONFIG_FIH_PLATE2) += sdm630-mtp-pl2-preEVT.dtb \
+# 		sdm630-mtp-pl2-EVT1.5.dtb \
+# 		sdm630-mtp-pl2-EVT1.5-CD.dtb \
+# 		sdm660-mtp-pl2-preEVT.dtb
+
+dtb-y +=	sdm630-mtp-pl2-dvt.dtb
 
 dtb-$(CONFIG_FIH_TAISHAN) += sdm660-mtp-tas-preEVT.dtb \
 		sdm660-mtp-tas-EVT.dtb \
