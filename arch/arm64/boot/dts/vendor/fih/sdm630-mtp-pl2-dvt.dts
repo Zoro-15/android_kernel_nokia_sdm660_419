@@ -15,10 +15,10 @@
 
 #include "../qcom/sdm630.dtsi"
 #include "../qcom/sdm630-mtp.dtsi"
-#include "nokia/audio/sdm660-internal-codec-pl2.dtsi"
+//#include "nokia/audio/sdm660-internal-codec-pl2.dtsi"
 #include "nokia/platform/pl2-preEVT-630.dtsi"
 /* fih Common includes */
-#include "fih-sdm630-common.dtsi"
+//#include "fih-sdm630-common.dtsi"
 
 / {
 	model = "Qualcomm Technologies, Inc. SDM 630 PM660 + PM660L MTP, PL2 dvt";
