@@ -12,10 +12,16 @@
 			no-map;
 			reg = <0 0xAC800000 0 0x00300000>;
 		};
-		pstore_region: pstore_region@ACB00000 {
-			compatible = "removed-dma-pool";
+		ramoops: ramoops@acb00000 {
+			compatible = "removed-dma-pool", "ramoops";
 			no-map;
 			reg = <0 0xACB00000 0 0x00200000>;
+			record-size = <0x1000>;
+			console-size = <0x180000>;
+			ftrace-size = <0x0>;
+			pmsg-size = <0x0>;
+			ecc-size = <0x0>;
+			status = "okay";
 		};
 	};
 };
