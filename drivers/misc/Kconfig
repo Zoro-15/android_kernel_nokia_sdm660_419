@@ -685,3 +685,10 @@ config OKL4_LINK_SHBUF
 	      transport. This driver presents the link to Linux as a character device
 	      which can be written to or read from to access the shared memory. An ioctl
 	      on the device is used to send a virtual interrupt to the partner cell.
+
+config POWERKEY_FORCECRASH
+	tristate "Force a crash on powerkey long press"
+	default n
+	help
+	  Say Y here if you want force crash functionality through power
+	  key. Triggers panic if power key is hold for more than 10secs.
