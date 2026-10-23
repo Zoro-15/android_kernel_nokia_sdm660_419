@@ -1,0 +1,196 @@
+name: Build Nokia 6.1 (PL2) 4.19 Kernel & Lineage 24 Boot Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - lineage-23.2
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Kernel & Repack Lineage 24 Boot Image
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc bison build-essential curl flex git libssl-dev libelf-dev lz4 python3 python-is-python3 libncurses-dev xz-utils zlib1g-dev cpio zip gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Download Clang Toolchain
+        run: |
+          git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $GITHUB_WORKSPACE/clang
+
+      - name: Build Kernel (Image.gz-dtb)
+        run: |
+          set -e -x -o pipefail
+          export PATH=/usr/bin:$GITHUB_WORKSPACE/clang/bin:$PATH
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CC=clang
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export KCFLAGS="-Wno-error"
+
+          # Avoid warnings treated as errors in techpack audio under modern Clang
+          find techpack/audio -type f \( -name "Kbuild" -o -name "Makefile" \) -exec sed -i 's/-Werror//g' {} +
+
+          # Defconfig combination for PL2 (Nokia 6.1)
+          make O=out \
+            CC=clang \
+            HOSTCC="gcc -B/usr/bin/" \
+            HOSTCXX="g++ -B/usr/bin/" \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            vendor/sdm660-perf_defconfig vendor/nokia/nokia.config vendor/nokia/B2N.config vendor/nokia/PL2.config
+
+          # Compile
+          make -j$(nproc --all) O=out \
+            CC=clang \
+            HOSTCC="gcc -B/usr/bin/" \
+            HOSTCXX="g++ -B/usr/bin/" \
+            CROSS_COMPILE=aarch64-linux-gnu- \
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi- \
+            KCFLAGS="-Wno-error" 2>&1 | tee build.log
+
+      - name: Package Standalone 4.19 Kernel Files
+        run: |
+          mkdir -p kernel_419
+          cp out/arch/arm64/boot/Image.gz-dtb kernel_419/ || cp out/arch/arm64/boot/Image.gz kernel_419/
+
+          # Prepare AnyKernel3 Package
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+          sed -i 's/device.name1=.*/device.name1=PL2/g' AnyKernel3/anykernel.sh
+          sed -i 's/device.name2=.*/device.name2=PL2_sprout/g' AnyKernel3/anykernel.sh
+          sed -i 's/device.name3=.*/device.name3=B2N/g' AnyKernel3/anykernel.sh
+          sed -i 's/device.name4=.*/device.name4=B2N_sprout/g' AnyKernel3/anykernel.sh
+
+          cp kernel_419/Image.gz-dtb AnyKernel3/ || cp kernel_419/Image.gz AnyKernel3/
+          cd AnyKernel3
+          zip -r9 ../kernel_419/Nokia_PL2_4.19-Kernel.zip * -x .git README.md
+          cd ..
+
+      - name: Repack Lineage 24 Boot Image with 4.19 Kernel
+        run: |
+          # Obtain native x86_64 magiskboot binary
+          curl -sL https://github.com/topjohnwu/Magisk/releases/download/v28.1/Magisk-v28.1.apk -o magisk.zip
+          unzip -p magisk.zip lib/x86_64/libmagiskboot.so > ./magiskboot
+          chmod +x ./magiskboot
+
+          BASE_IMG="prebuilts/boot24.img"
+          OUT_IMG="boot-4.19-PL2-lin24.img"
+
+          if [ ! -f "$BASE_IMG" ]; then
+            echo "ERROR: Base boot image $BASE_IMG not found!" && exit 1
+          fi
+
+          mkdir -p repack_lin24 && cd repack_lin24
+
+          # Unpack base boot image
+          ../magiskboot unpack -h "../$BASE_IMG" || ../magiskboot unpack "../$BASE_IMG"
+
+          # Replace kernel with 4.19 Image.gz-dtb
+          cp ../kernel_419/Image.gz-dtb kernel
+
+          # Inject Renesas R69338 panel cmdline, FBCon onscreen console & permissive SELinux
+          if [ -f header ]; then
+            cmdline=$(grep '^cmdline=' header | cut -d= -f2-)
+            for param in "mdss_mdp.panel=1:dsi:0:fih,mdss_dsi_r69338_1080p_video:config0:1:none:cfg:single_dsi" "console=tty0" "androidboot.selinux=permissive"; do
+              if ! echo "$cmdline" | grep -q "$param"; then
+                cmdline="$cmdline $param"
+              fi
+            done
+            sed -i "s|^cmdline=.*|cmdline=$cmdline|" header
+            echo "Updated cmdline in header:"
+            cat header
+          fi
+
+          # Repack
+          ../magiskboot repack "../$BASE_IMG" "../$OUT_IMG"
+          if [ ! -f "../$OUT_IMG" ] && [ -f new-boot.img ]; then
+            cp new-boot.img "../$OUT_IMG"
+          fi
+
+          cd ..
+          if [ ! -s "$OUT_IMG" ]; then
+            echo "ERROR: Failed to produce $OUT_IMG" && exit 1
+          fi
+          ls -lh "$OUT_IMG"
+
+      - name: Extract & Display Build Errors
+        if: failure()
+        run: |
+          mkdir -p build_logs
+          echo "### ❌ Build Failed — Error Summary" >> $GITHUB_STEP_SUMMARY
+          echo '```text' >> $GITHUB_STEP_SUMMARY
+          if [ -f build.log ]; then
+            grep -iE "error:|fatal error:|recipe for target.*failed" build.log | tail -n 50 > build_logs/errors_summary.txt || true
+            cat build_logs/errors_summary.txt >> $GITHUB_STEP_SUMMARY
+            gzip -c build.log > build_logs/build.log.gz
+          else
+            echo "No build.log found" > build_logs/errors_summary.txt
+            cat build_logs/errors_summary.txt >> $GITHUB_STEP_SUMMARY
+          fi
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload Build Log Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-logs
+          path: build_logs/
+
+      - name: Publish Failure Logs to Release
+        if: failure() && github.ref == 'refs/heads/lineage-23.2'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: failure-v${{ github.run_number }}
+          name: ❌ Build Failure Logs #${{ github.run_number }}
+          body: |
+            ## ❌ Kernel Build Failed on Run #${{ github.run_number }}
+            Attached is `errors_summary.txt` and full compressed `build.log.gz`.
+          files: |
+            build_logs/errors_summary.txt
+            build_logs/build.log.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nokia-PL2-4.19-Lin24-Artifacts
+          path: |
+            boot-4.19-PL2-lin24.img
+            kernel_419/Image.gz-dtb
+            kernel_419/Nokia_PL2_4.19-Kernel.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: PL2-4.19-v${{ github.run_number }}
+          name: Nokia 6.1 (PL2) 4.19 Kernel & Lineage 24 Boot Image #${{ github.run_number }}
+          body: |
+            ## Nokia 6.1 (PL2) 4.19 Kernel & LineageOS 24 Bringup
+
+            ### Artifacts Included:
+            - **`boot-4.19-PL2-lin24.img`**: Repacked LineageOS 24 boot image containing 4.19 kernel with injected Renesas `r69338` panel cmdline, `tty0` console, and permissive SELinux.
+            - **`Image.gz-dtb`**: Standalone 4.19 kernel binary (kept in `kernel_419/` folder).
+            - **`Nokia_PL2_4.19-Kernel.zip`**: AnyKernel3 flashable package for recovery/TWRP.
+
+            **Commit**: `${{ github.sha }}`
+          files: |
+            boot-4.19-PL2-lin24.img
+            kernel_419/Image.gz-dtb
+            kernel_419/Nokia_PL2_4.19-Kernel.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
