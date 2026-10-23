@@ -2982,6 +2982,15 @@ static int mdss_fb_open(struct fb_info *info, int user)
 		return -ESHUTDOWN;
 	}
 
+	/*
+	 * Guard against early FBCon/kernel open during register_framebuffer():
+	 * At early boot (user == 0), overlay private data (mdp.private1) is not
+	 * yet allocated and external I2C boost drivers have not probed yet.
+	 * Allow console open without triggering premature unblank.
+	 */
+	if (!user || !mfd->mdp.private1)
+		return 0;
+
 	file_info = kmalloc(sizeof(*file_info), GFP_KERNEL);
 	if (!file_info)
 		return -ENOMEM;
@@ -2992,8 +3001,8 @@ static int mdss_fb_open(struct fb_info *info, int user)
 	result = pm_runtime_get_sync(info->dev);
 
 	if (result < 0) {
-		pr_err("pm_runtime: fail to wake up\n");
-		goto pm_error;
+		pr_warn_once("pm_runtime: fail to wake up (%d), ignoring for fb%d\n",
+			result, mfd->index);
 	}
 
 	if (!mfd->ref_cnt) {
