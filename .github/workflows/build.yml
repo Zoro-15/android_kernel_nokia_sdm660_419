@@ -100,10 +100,10 @@ jobs:
           # Replace kernel with 4.19 Image.gz-dtb
           cp ../kernel_419/Image.gz-dtb kernel
 
-          # Inject Renesas R69338 panel cmdline, FBCon onscreen console & permissive SELinux
+          # Inject Renesas R69338 panel cmdline, FBCon onscreen console, watchdog disable & permissive SELinux
           if [ -f header ]; then
             cmdline=$(grep '^cmdline=' header | cut -d= -f2-)
-            for param in "mdss_mdp.panel=1:dsi:0:fih,mdss_dsi_r69338_1080p_video:config0:1:none:cfg:single_dsi" "console=tty0" "androidboot.selinux=permissive"; do
+            for param in "mdss_mdp.panel=1:dsi:0:fih,mdss_dsi_r69338_1080p_video:config0:1:none:cfg:single_dsi" "console=tty0" "androidboot.selinux=permissive" "watchdog_v2.enable=0"; do
               if ! echo "$cmdline" | grep -q "$param"; then
                 cmdline="$cmdline $param"
               fi
@@ -111,6 +111,15 @@ jobs:
             sed -i "s|^cmdline=.*|cmdline=$cmdline|" header
             echo "Updated cmdline in header:"
             cat header
+          fi
+
+          # Patch recovery ramdisk: un-disable adbd, set debuggable props, add early gadget init
+          if [ -f ramdisk.cpio ]; then
+            mkdir -p rd && cd rd
+            cpio -idmv < ../ramdisk.cpio 2>/dev/null || true
+            python3 $GITHUB_WORKSPACE/.github/scripts/patch_ramdisk.py .
+            find . | cpio -H newc -o > ../ramdisk.cpio 2>/dev/null
+            cd .. && rm -rf rd
           fi
 
           # Repack
