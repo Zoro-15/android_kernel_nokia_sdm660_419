@@ -177,7 +177,6 @@ static void setAudioHapticsEnabled(struct drv2605L_data *pDrv2605Ldata, int enab
 					INPUT_ANALOG);
 
 			drv2605L_change_mode(pDrv2605Ldata, WORK_AUDIO2HAPTIC, DEV_READY);
-			extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_AUDIO2HAPTIC);
 		}
     } else {
         // Chip needs to be brought out of standby to change the registers
@@ -195,7 +194,6 @@ static void setAudioHapticsEnabled(struct drv2605L_data *pDrv2605Ldata, int enab
 					Control3_REG_PWMANALOG_MASK,
 					INPUT_PWM);
 
-			extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_IDLE);
 			drv2605L_change_mode(pDrv2605Ldata, WORK_IDLE, DEV_STANDBY); // Disable audio-to-haptics
 		}
     }
@@ -203,7 +201,6 @@ static void setAudioHapticsEnabled(struct drv2605L_data *pDrv2605Ldata, int enab
 
 static void play_effect(struct drv2605L_data *pDrv2605Ldata)
 {
-	extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_SEQUENCE_PLAYBACK);
 	drv2605L_change_mode(pDrv2605Ldata, WORK_SEQ_PLAYBACK, DEV_READY);
     drv2605L_set_waveform_sequence(pDrv2605Ldata, pDrv2605Ldata->sequence, WAVEFORM_SEQUENCER_MAX);
 	pDrv2605Ldata->vibrator_is_playing = YES;
@@ -221,7 +218,6 @@ static void play_effect(struct drv2605L_data *pDrv2605Ldata)
         setAudioHapticsEnabled(pDrv2605Ldata, YES);
     } else {
         drv2605L_change_mode(pDrv2605Ldata, WORK_IDLE, DEV_STANDBY);
-		extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_IDLE);
 		pDrv2605Ldata->vibrator_is_playing = NO;
 		__pm_relax(pDrv2605Ldata->wklock);
     }
@@ -234,7 +230,6 @@ static void play_Pattern_RTP(struct drv2605L_data *pDrv2605Ldata)
 		if(pDrv2605Ldata->repeat_times == 0){
 			drv2605L_change_mode(pDrv2605Ldata, WORK_IDLE, DEV_STANDBY);
 			pDrv2605Ldata->vibrator_is_playing = NO;
-			extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_IDLE);
 			__pm_relax(pDrv2605Ldata->wklock);
 		}else{
 			hrtimer_start(&pDrv2605Ldata->timer, ns_to_ktime((u64)pDrv2605Ldata->silience_time * NSEC_PER_MSEC), HRTIMER_MODE_REL);
@@ -261,7 +256,6 @@ static void play_Seq_RTP(struct drv2605L_data *pDrv2605Ldata)
 	}else{
 		drv2605L_change_mode(pDrv2605Ldata, WORK_IDLE, DEV_STANDBY);
 		pDrv2605Ldata->vibrator_is_playing = NO;
-		extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_IDLE);
 		__pm_relax(pDrv2605Ldata->wklock);
 	}
 }
@@ -275,7 +269,6 @@ static void vibrator_off(struct drv2605L_data *pDrv2605Ldata)
 			pDrv2605Ldata->vibrator_is_playing = NO;
 			drv2605L_set_go_bit(pDrv2605Ldata, STOP);
 			drv2605L_change_mode(pDrv2605Ldata, WORK_IDLE, DEV_STANDBY);
-			extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_IDLE);
 
 			__pm_relax(pDrv2605Ldata->wklock);
             #if 0
@@ -551,7 +544,6 @@ static void vibrator_enable(struct led_classdev *cdev, int value)
 		drv2605L_change_mode(pDrv2605Ldata, WORK_VIBRATOR, DEV_READY);
 #endif
 		pDrv2605Ldata->vibrator_is_playing = YES;
-		extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_RTP_PLAYBACK);
 
 		value = (value>MAX_TIMEOUT)?MAX_TIMEOUT:value;
         hrtimer_start(&pDrv2605Ldata->timer, ns_to_ktime((u64)value * NSEC_PER_MSEC), HRTIMER_MODE_REL);
@@ -851,7 +843,6 @@ static ssize_t dev2605L_write(struct file* filp, const char* buff, size_t len, l
 				if(pDrv2605Ldata->audio_haptics_enabled == NO){			
 					__pm_stay_awake(pDrv2605Ldata->wklock);
 				}
-				extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_RTP_PLAYBACK);
 				pDrv2605Ldata->vibrator_is_playing = YES;
   				value = (value > MAX_TIMEOUT)?MAX_TIMEOUT:value;
 				drv2605L_change_mode(pDrv2605Ldata, WORK_RTP, DEV_READY);
@@ -874,7 +865,6 @@ static ssize_t dev2605L_write(struct file* filp, const char* buff, size_t len, l
 				if(pDrv2605Ldata->audio_haptics_enabled == NO){
 					__pm_stay_awake(pDrv2605Ldata->wklock);
 				}
-				extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_RTP_PLAYBACK);
 				pDrv2605Ldata->vibrator_is_playing = YES;
                 if(pDrv2605Ldata->repeat_times > 0)
 					pDrv2605Ldata->repeat_times--;
@@ -902,7 +892,6 @@ static ssize_t dev2605L_write(struct file* filp, const char* buff, size_t len, l
 					if(pDrv2605Ldata->audio_haptics_enabled == NO){
 						__pm_stay_awake(pDrv2605Ldata->wklock);
 					}
-					extcon_set_state_sync(&pDrv2605Ldata->sw_dev, 0, SW_STATE_RTP_PLAYBACK);
 					drv2605L_change_mode(pDrv2605Ldata, WORK_SEQ_RTP_OFF, DEV_IDLE);
 					schedule_work(&pDrv2605Ldata->vibrator_work);
 				}else{
@@ -1036,13 +1025,6 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
         goto fail3;
     }
 
-	pDrv2605Ldata->sw_dev.name = "haptics";
-	reval = extcon_dev_register(&pDrv2605Ldata->sw_dev);
-	if (reval < 0) {
-		printk(KERN_ALERT"drv2605: fail to register switch\n");
-		goto fail4;
-	}
-
 	pDrv2605Ldata->led_dev.name = "vibrator";
 	pDrv2605Ldata->led_dev.brightness_get = drv2605l_brightness_get;
 	pDrv2605Ldata->led_dev.brightness_set = drv2605l_brightness_set;
@@ -1051,7 +1033,7 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 	reval = devm_led_classdev_register(pDrv2605Ldata->device, &pDrv2605Ldata->led_dev);
 	if (reval < 0) {
 		pr_err("Error in registering led class device, reval=%d\n", reval);
-		goto fail4;
+		goto fail3;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(qpnp_hap_attrs); i++) {
@@ -1077,8 +1059,6 @@ fail5:
 	for (--i; i >= 0; i--)
 		sysfs_remove_file(&pDrv2605Ldata->led_dev.dev->kobj,
 				&qpnp_hap_attrs[i].attr);
-fail4:
-	extcon_dev_unregister(&pDrv2605Ldata->sw_dev);
 fail3:
 	device_destroy(pDrv2605Ldata->class, pDrv2605Ldata->version);
 fail2:

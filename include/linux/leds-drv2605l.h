@@ -27,8 +27,6 @@
 ** =============================================================================
 */
 
-#include <linux/extcon.h>
-#include <../../drivers/extcon/extcon.h>
 #include <linux/regmap.h>
 #include <linux/timer.h>
 #include <linux/workqueue.h>
@@ -456,7 +454,6 @@ struct drv2605L_data {
 	dev_t version;
 	struct semaphore sem;
 	struct cdev cdev;
-	struct extcon_dev sw_dev;
 	volatile int audio_haptics_enabled;
 	volatile int vibrator_is_playing;
 	char ReadBuff[MAX_READ_BYTES];
