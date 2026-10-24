@@ -988,7 +988,7 @@ static struct file_operations fops =
     .write = dev2605L_write,
 };
 
-static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
+static int Haptics_init(struct drv2605L_data *pDrv2605Ldata, struct device *dev)
 {
 	int reval = -ENOMEM;
 	int i = 0;
@@ -1008,7 +1008,7 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
         goto fail1;
     }
 
-    pDrv2605Ldata->device = device_create(pDrv2605Ldata->class, NULL, pDrv2605Ldata->version, NULL, HAPTICS_DEVICE_NAME);
+    pDrv2605Ldata->device = device_create(pDrv2605Ldata->class, dev, pDrv2605Ldata->version, NULL, HAPTICS_DEVICE_NAME);
     if (!pDrv2605Ldata->device)
     {
         printk(KERN_ALERT"drv2605: error creating device 2605L\n");
@@ -1030,7 +1030,7 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 	pDrv2605Ldata->led_dev.brightness_set = drv2605l_brightness_set;
 	pDrv2605Ldata->led_dev.max_brightness = 100;
 
-	reval = devm_led_classdev_register(pDrv2605Ldata->device, &pDrv2605Ldata->led_dev);
+	reval = devm_led_classdev_register(dev, &pDrv2605Ldata->led_dev);
 	if (reval < 0) {
 		pr_err("Error in registering led class device, reval=%d\n", reval);
 		goto fail3;
@@ -1040,7 +1040,7 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
 		reval = sysfs_create_file(&pDrv2605Ldata->led_dev.dev->kobj,
 						&qpnp_hap_attrs[i].attr);
 		if (reval < 0) {
-			dev_err(pDrv2605Ldata->device, "Error in creating sysfs file, ret=%d\n",
+			dev_err(dev, "Error in creating sysfs file, ret=%d\n",
 				reval);
 			goto fail5;
 		}
@@ -1050,7 +1050,7 @@ static int Haptics_init(struct drv2605L_data *pDrv2605Ldata)
     pDrv2605Ldata->timer.function = vibrator_timer_func;
     INIT_WORK(&pDrv2605Ldata->vibrator_work, vibrator_work_routine);
     INIT_WORK(&pDrv2605Ldata->vibrator_pattern_work, vibrator_pattern_work_routine);
-    pDrv2605Ldata->wklock  = wakeup_source_register(pDrv2605Ldata->device, "vibrator");
+    pDrv2605Ldata->wklock  = wakeup_source_register(dev, "vibrator");
     mutex_init(&pDrv2605Ldata->lock);
 
     return 0;
@@ -1477,7 +1477,7 @@ static int drv2605L_probe(struct i2c_client* client, const struct i2c_device_id*
     /* Put hardware in standby */
     drv2605L_change_mode(pDrv2605Ldata, WORK_IDLE, DEV_STANDBY);
 
-    Haptics_init(pDrv2605Ldata);
+    Haptics_init(pDrv2605Ldata, &client->dev);
 
 	pDRV2605Ldata = pDrv2605Ldata;
     printk(KERN_ERR"drv2605 probe succeeded\n");
