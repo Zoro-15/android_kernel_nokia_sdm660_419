@@ -66,7 +66,6 @@
 ******************************************************************************/
 struct i2c_client *fts_i2c_client;
 struct fts_ts_data *fts_wq_data;
-struct fts_ts_data *fts_data_pl2;
 struct input_dev *fts_input_dev;
 
 extern int tp_probe_success;	//SW4-HL-TouchPanel-AccordingToTPDriverProbeResultToDecideWhetherToCreateVirtualFileOrNot-00+_20151130
@@ -277,11 +276,10 @@ static int fts_input_dev_init( struct i2c_client *client, struct fts_ts_data *da
 
 	point_num = pdata->max_touch_number;
 	data->pnt_buf_size = point_num * FTS_ONE_TCH_LEN + 3;
-	data->point_buf = (u8 *) kzalloc(data->pnt_buf_size, GFP_KERNEL);
+	data->point_buf = devm_kzalloc(&client->dev, data->pnt_buf_size, GFP_KERNEL);
 	if (!data->point_buf) {
 		FTS_ERROR("failed to alloc memory for point buf!");
-		err = -ENOMEM;
-		goto err_point_buf;
+		return -ENOMEM;
 	}
 
     err = input_register_device(input_dev);
@@ -297,8 +295,6 @@ static int fts_input_dev_init( struct i2c_client *client, struct fts_ts_data *da
 
 free_inputdev:
     input_free_device(input_dev);
-err_point_buf:
-    kfree(data->point_buf);
     FTS_FUNC_EXIT();
     return err;
 
@@ -438,9 +434,9 @@ static void fts_show_touch_buffer(u8 *buf, int point_num)
     int i;
 
     memset(g_sz_debug, 0, 1024);
-    if (len > (fts_data_pl2->pnt_buf_size - 3))
+    if (len > (fts_wq_data->pnt_buf_size - 3))
     {
-        len = fts_data_pl2->pnt_buf_size - 3;
+        len = fts_wq_data->pnt_buf_size - 3;
     }
     else if (len == 0)
     {
@@ -740,6 +736,8 @@ static int fts_read_touchdata(struct fts_ts_data *data)
         fts_i2c_read(data->client, buf+9, 1, buf+9, (event->point_num - 1) * FTS_ONE_TCH_LEN);
     }
 #else
+
+    memset(buf, 0, data->pnt_buf_size);
     ret = fts_i2c_read(data->client, buf, 1, buf, data->pnt_buf_size);
     if (ret < 0)
     {
@@ -1330,7 +1328,6 @@ static int fts_ts_probe(struct i2c_client *client, const struct i2c_device_id *i
 	
 
     data->input_dev = input_dev;
-    fts_data_pl2 = data;
     data->client = client;
     data->pdata = pdata;
 
