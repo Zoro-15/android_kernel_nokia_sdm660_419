@@ -119,6 +119,9 @@ void gt1x_irq_enable(void)
 
 	GTP_DEBUG_FUNC();
 
+	if (!gt1x_i2c_client)
+		return;
+
 	spin_lock_irqsave(&irq_lock, irqflags);
 	if (irq_is_disable) {
 		irq_is_disable = 0;
@@ -845,6 +848,7 @@ static int gt1x_ts_probe(struct i2c_client *client, const struct i2c_device_id *
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		GTP_ERROR("I2C check functionality failed.");
+		gt1x_i2c_client = NULL;
 		return -ENODEV;
 	}
 
@@ -862,6 +866,7 @@ static int gt1x_ts_probe(struct i2c_client *client, const struct i2c_device_id *
 	ret = gt1x_request_io_port();
 	if (ret < 0) {
 		GTP_ERROR("GTP request IO port failed.");
+		gt1x_i2c_client = NULL;
 		return ret;
 	}
 
