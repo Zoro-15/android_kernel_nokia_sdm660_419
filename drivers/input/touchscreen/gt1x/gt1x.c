@@ -951,6 +951,8 @@ static int gt1x_ts_remove(struct i2c_client *client)
     gtp_test_sysfs_deinit();
 #endif
 
+    gt1x_i2c_client = NULL;
+
     return 0;
 }
 
