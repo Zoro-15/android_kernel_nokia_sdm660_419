@@ -1,0 +1,94 @@
+name: Build Nokia 6.1 (PL2) 4.19 Kernel
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - lineage-23.2
+
+jobs:
+  build:
+    name: Build 4.19 Kernel (Image.gz & Image.gz-dtb)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Kernel Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install Build Dependencies
+        run: |
+          sudo apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=30
+          sudo apt-get install -y -o Acquire::Retries=3 -o Acquire::http::Timeout=30 \
+            bc bison flex libssl-dev libelf-dev lz4 cpio python3 \
+            clang lld llvm gcc-aarch64-linux-gnu gcc-arm-linux-gnueabi
+
+      - name: Configure & Build Kernel (Image.gz & Image.gz-dtb)
+        run: |
+          set -e -x -o pipefail
+
+          COMMON_FLAGS="O=out ARCH=arm64 SUBARCH=arm64 LLVM=1 LLVM_IAS=1 CROSS_COMPILE=aarch64-linux-gnu- CROSS_COMPILE_COMPAT=arm-linux-gnueabi-"
+
+          # Merge sdm660-perf + nokia + PL2 configs
+          make $COMMON_FLAGS \
+            vendor/sdm660-perf_defconfig \
+            vendor/nokia/nokia.config \
+            vendor/nokia/PL2.config
+
+          # Compile Image.gz and Image.gz-dtb
+          make -j$(nproc --all) $COMMON_FLAGS \
+            KCFLAGS="-Wno-error" \
+            Image.gz Image.gz-dtb 2>&1 | tee build.log
+
+      - name: Verify & Collect Kernel Images
+        run: |
+          mkdir -p artifacts
+
+          if [ ! -f out/arch/arm64/boot/Image.gz ]; then
+            echo "ERROR: out/arch/arm64/boot/Image.gz not found!" && exit 1
+          fi
+          if [ ! -f out/arch/arm64/boot/Image.gz-dtb ]; then
+            echo "ERROR: out/arch/arm64/boot/Image.gz-dtb not found!" && exit 1
+          fi
+
+          cp out/arch/arm64/boot/Image.gz artifacts/Image.gz
+          cp out/arch/arm64/boot/Image.gz-dtb artifacts/Image.gz-dtb
+
+          echo "Kernel images built successfully:"
+          ls -lh artifacts/
+
+      - name: Extract & Display Build Errors
+        if: failure()
+        run: |
+          mkdir -p build_logs
+          echo "### Build Failed - Error Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          if [ -f build.log ]; then
+            grep -iE "error:|fatal error:|recipe for target.*failed" build.log | tail -n 50 > build_logs/errors_summary.txt || true
+            cat build_logs/errors_summary.txt >> "$GITHUB_STEP_SUMMARY"
+            gzip -c build.log > build_logs/build.log.gz
+          else
+            echo "No build.log found" > build_logs/errors_summary.txt
+            cat build_logs/errors_summary.txt >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Build Log Artifacts on Failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-failure-logs
+          path: build_logs/
+          retention-days: 1
+
+      - name: Upload Kernel Artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Nokia-PL2-419-Kernel
+          path: |
+            artifacts/Image.gz
+            artifacts/Image.gz-dtb
+            build.log
+          retention-days: 3
