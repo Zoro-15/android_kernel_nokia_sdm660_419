@@ -2266,6 +2266,11 @@ int gt1x_suspend(void)
 	u8 buf[1] = { 0 };
 #endif
 
+	if (!gt1x_i2c_client) {
+		GTP_ERROR("gt1x not probed, skip suspend.");
+		return 0;
+	}
+
     if (update_info.status) {
         return 0;
     }
@@ -2363,6 +2368,11 @@ EXPORT_SYMBOL(hlt_tp_lcm_suspend);
 int gt1x_resume(void)
 {
 	s32 ret = -1;
+
+	if (!gt1x_i2c_client) {
+		GTP_ERROR("gt1x not probed, skip resume.");
+		return 0;
+	}
 
     if (update_info.status) {
         return 0;

@@ -119,6 +119,9 @@ void gt1x_irq_enable(void)
 
 	GTP_DEBUG_FUNC();
 
+	if (!gt1x_i2c_client)
+		return;
+
 	spin_lock_irqsave(&irq_lock, irqflags);
 	if (irq_is_disable) {
 		irq_is_disable = 0;
@@ -138,6 +141,9 @@ void gt1x_irq_disable(void)
 	unsigned long irqflags;
 
 	GTP_DEBUG_FUNC();
+
+	if (!gt1x_i2c_client)
+		return;
 
 	synchronize_irq(gt1x_i2c_client->irq);
 	spin_lock_irqsave(&irq_lock, irqflags);
@@ -842,6 +848,7 @@ static int gt1x_ts_probe(struct i2c_client *client, const struct i2c_device_id *
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		GTP_ERROR("I2C check functionality failed.");
+		gt1x_i2c_client = NULL;
 		return -ENODEV;
 	}
 
@@ -859,6 +866,7 @@ static int gt1x_ts_probe(struct i2c_client *client, const struct i2c_device_id *
 	ret = gt1x_request_io_port();
 	if (ret < 0) {
 		GTP_ERROR("GTP request IO port failed.");
+		gt1x_i2c_client = NULL;
 		return ret;
 	}
 
@@ -942,6 +950,8 @@ static int gt1x_ts_remove(struct i2c_client *client)
 #ifdef CONFIG_TOUCHSCREEN_GX_TESTS
     gtp_test_sysfs_deinit();
 #endif
+
+    gt1x_i2c_client = NULL;
 
     return 0;
 }
@@ -1094,14 +1104,6 @@ static struct i2c_driver gt1x_ts_driver = {
  */
 static int __init gt1x_ts_init(void)
 {
-    if (strstr(saved_command_line, "androidboot.device=PL2") != NULL)
-    {
-        if (gpio_get_value(12) == 0)
-        {
-            GTP_ERROR("[snow] lcm is ctc exit gt1x init now");
-            return 0;
-        }
-    }
 	GTP_DEBUG_FUNC();
 	GTP_INFO("GTP driver installing...");
 /*
