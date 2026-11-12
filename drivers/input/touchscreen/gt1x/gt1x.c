@@ -139,6 +139,9 @@ void gt1x_irq_disable(void)
 
 	GTP_DEBUG_FUNC();
 
+	if (!gt1x_i2c_client)
+		return;
+
 	synchronize_irq(gt1x_i2c_client->irq);
 	spin_lock_irqsave(&irq_lock, irqflags);
 	if (!irq_is_disable) {
@@ -1094,14 +1097,6 @@ static struct i2c_driver gt1x_ts_driver = {
  */
 static int __init gt1x_ts_init(void)
 {
-    if (strstr(saved_command_line, "androidboot.device=PL2") != NULL)
-    {
-        if (gpio_get_value(12) == 0)
-        {
-            GTP_ERROR("[snow] lcm is ctc exit gt1x init now");
-            return 0;
-        }
-    }
 	GTP_DEBUG_FUNC();
 	GTP_INFO("GTP driver installing...");
 /*
