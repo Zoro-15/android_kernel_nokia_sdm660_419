@@ -88,5 +88,6 @@
 			pinctrl-3 = <&ts_int_input>;
 			goodix,rst-gpio = <&tlmm 66 0x01>;
 			goodix,irq-gpio = <&tlmm 67 0x02>;
+			fih,lcm-id-gpios = <&tlmm 12 0>;
 	};
 };

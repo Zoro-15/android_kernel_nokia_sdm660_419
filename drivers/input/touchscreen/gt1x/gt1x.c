@@ -1088,7 +1088,24 @@ static struct i2c_driver gt1x_ts_driver = {
 		   },
 };
 
-/**   
+static int gt1x_get_lcm_id(void)
+{
+	struct device_node *np;
+	int gpio;
+
+	np = of_find_compatible_node(NULL, NULL, "goodix,gt1x");
+	if (!np)
+		return -ENODEV;
+
+	gpio = of_get_named_gpio(np, "fih,lcm-id-gpios", 0);
+	of_node_put(np);
+	if (!gpio_is_valid(gpio))
+		return -ENODEV;
+
+	return gpio_get_value(gpio);
+}
+
+/**
  * gt1x_ts_init - Driver Install function.
  * Return   0---succeed.
  */
@@ -1096,7 +1113,7 @@ static int __init gt1x_ts_init(void)
 {
     if (strstr(saved_command_line, "androidboot.device=PL2") != NULL)
     {
-        if (gpio_get_value(12) == 0)
+        if (gt1x_get_lcm_id() == 0)
         {
             GTP_ERROR("[snow] lcm is ctc exit gt1x init now");
             return 0;
