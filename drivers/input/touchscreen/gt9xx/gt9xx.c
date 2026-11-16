@@ -78,13 +78,12 @@ int gtp_i2c_read(struct i2c_client *client, u8 *buf, int len)
 {
     unsigned int transfer_length = 0;
     unsigned int pos = 0, address = (buf[0] << 8) + buf[1];
-    unsigned char get_buf[64], addr_buf[2];
+    u8 *addr_buf = NULL, *read_buf = NULL;
     int retry, r = 2;
     struct i2c_msg msgs[] = {
         {
             .addr = client->addr,
             .flags = !I2C_M_RD,
-            .buf = &addr_buf[0],
             .len = GTP_ADDR_LENGTH,
         }, {
             .addr = client->addr,
@@ -93,15 +92,17 @@ int gtp_i2c_read(struct i2c_client *client, u8 *buf, int len)
     };
 
     len -= GTP_ADDR_LENGTH;
-    if (likely(len < sizeof(get_buf))) {
-        /* code optimize, use stack memory */
-        msgs[1].buf = &get_buf[0];
-    } else {
-        msgs[1].buf = kzalloc(len > I2C_MAX_TRANSFER_SIZE
-                ? I2C_MAX_TRANSFER_SIZE : len, GFP_KERNEL);
-        if (!msgs[1].buf)
-            return -ENOMEM;
+
+    addr_buf = kmalloc(GTP_ADDR_LENGTH, GFP_KERNEL);
+    read_buf = kzalloc(len > I2C_MAX_TRANSFER_SIZE
+            ? I2C_MAX_TRANSFER_SIZE : len, GFP_KERNEL);
+    if (!addr_buf || !read_buf) {
+        r = -ENOMEM;
+        goto read_exit;
     }
+
+    msgs[0].buf = addr_buf;
+    msgs[1].buf = read_buf;
 
     while (pos != len) {
         if (unlikely(len - pos > I2C_MAX_TRANSFER_SIZE))
@@ -131,8 +132,8 @@ int gtp_i2c_read(struct i2c_client *client, u8 *buf, int len)
         }
     }
 read_exit:
-    if (len >= sizeof(get_buf))
-        kfree(msgs[1].buf);
+    kfree(addr_buf);
+    kfree(read_buf);
     return r;
 }
 
@@ -153,22 +154,18 @@ int gtp_i2c_write(struct i2c_client *client, u8 *buf, int len)
 {
     unsigned int pos = 0, transfer_length = 0;
     unsigned int address = (buf[0] << 8) + buf[1];
-    unsigned char put_buf[64];
+    u8 *msg_buf = NULL;
     int retry, r = 1;
     struct i2c_msg msg = {
             .addr = client->addr,
             .flags = !I2C_M_RD,
     };
 
-    if (likely(len < sizeof(put_buf))) {
-        /* code optimize,use stack memory*/
-        msg.buf = &put_buf[0];
-    } else {
-        msg.buf = kmalloc(len > I2C_MAX_TRANSFER_SIZE
-                  ? I2C_MAX_TRANSFER_SIZE : len, GFP_KERNEL);
-        if (!msg.buf)
-            return -ENOMEM;
-    }
+    msg_buf = kmalloc(len > I2C_MAX_TRANSFER_SIZE
+              ? I2C_MAX_TRANSFER_SIZE : len, GFP_KERNEL);
+    if (!msg_buf)
+        return -ENOMEM;
+    msg.buf = msg_buf;
 
     len -= GTP_ADDR_LENGTH;
     while (pos != len) {
@@ -198,8 +195,7 @@ int gtp_i2c_write(struct i2c_client *client, u8 *buf, int len)
         }
     }
 write_exit:
-    if (len + GTP_ADDR_LENGTH >= sizeof(put_buf))
-        kfree(msg.buf);
+    kfree(msg_buf);
     return r;
 }
 
