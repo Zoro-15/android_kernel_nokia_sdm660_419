@@ -4598,7 +4598,8 @@ static int typec_try_sink(struct smb_charger *chg)
 		return ATTACHED_SRC;
 
 	typec_mode = smblib_get_prop_typec_mode(chg);
-	if (typec_mode == POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER
+	if (typec_mode == POWER_SUPPLY_TYPEC_SINK
+		|| typec_mode == POWER_SUPPLY_TYPEC_SINK_AUDIO_ADAPTER
 		|| typec_mode == POWER_SUPPLY_TYPEC_SINK_DEBUG_ACCESSORY)
 		return ATTACHED_SRC;
 
@@ -4725,11 +4726,13 @@ try_wait_src:
 		exit_mode = UNATTACHED_SINK;
 
 try_sink_exit:
-	/* release forcing of SRC/SNK mode */
-	val.intval = POWER_SUPPLY_TYPEC_PR_DUAL;
-	rc = smblib_set_prop_typec_power_role(chg, &val);
-	if (rc < 0)
-		smblib_err(chg, "Couldn't set DFP mode rc=%d\n", rc);
+	/* release forcing of SRC/SNK mode only if not attached as source */
+	if (exit_mode != ATTACHED_SRC) {
+		val.intval = POWER_SUPPLY_TYPEC_PR_DUAL;
+		rc = smblib_set_prop_typec_power_role(chg, &val);
+		if (rc < 0)
+			smblib_err(chg, "Couldn't set DFP mode rc=%d\n", rc);
+	}
 
 	/* revert Tccdebounce time back to ~120ms */
 	rc = smblib_masked_write(chg, MISC_CFG_REG, TCC_DEBOUNCE_20MS_BIT, 0);

@@ -210,7 +210,7 @@ static ssize_t weak_chg_icl_ua_store(struct device *dev,
 }
 static DEVICE_ATTR_RW(weak_chg_icl_ua);
 
-static int __try_sink_enabled = 1;
+static int __try_sink_enabled = 0;
 static ssize_t try_sink_enabled_show(struct device *dev, struct device_attribute
 				     *attr, char *buf)
 {
