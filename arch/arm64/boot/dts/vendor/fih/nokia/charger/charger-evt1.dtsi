@@ -45,6 +45,8 @@
 	qcom,step-charging-enable;
 	qcom,sw-jeita-enable;
 	qcom,wd-bark-time-secs = <64>;
+	qcom,otg-cl-ua = <1000000>;
+	qcom,boost-threshold-ua = <100000>;
 //	qcom,step-soc-thresholds = <50 55 60 63>;
 //	qcom,step-current-deltas = <1500000 0 0 0 0>;
 	fih,jeita_full_capacity = <1>;
