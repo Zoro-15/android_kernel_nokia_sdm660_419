@@ -67,50 +67,50 @@ jobs:
           rm -rf anykernel/.git anykernel/.github
 
           cat << 'EOF' > anykernel/anykernel.sh
-### AnyKernel3 Ramdisk Mod Script
-## osm0sis @ xda-developers
+          ### AnyKernel3 Ramdisk Mod Script
+          ## osm0sis @ xda-developers
 
-### AnyKernel setup
-# global properties
-properties() { '
-kernel.string=Nokia 6.1 (PL2) 4.19 Kernel by Zoro
-do.devicecheck=1
-do.modules=0
-do.systemless=1
-do.cleanup=1
-do.cleanuponabort=0
-device.name1=PL2
-device.name2=Plate2
-device.name3=PL2_sprout
-device.name4=DRG
-device.name5=DRG_sprout
-supported.versions=10-17
-supported.patchlevels=
-supported.vendorpatchlevels=
-'; } # end properties
+          ### AnyKernel setup
+          # global properties
+          properties() { '
+          kernel.string=Nokia 6.1 (PL2) 4.19 Kernel by Zoro
+          do.devicecheck=1
+          do.modules=0
+          do.systemless=1
+          do.cleanup=1
+          do.cleanuponabort=0
+          device.name1=PL2
+          device.name2=Plate2
+          device.name3=PL2_sprout
+          device.name4=DRG
+          device.name5=DRG_sprout
+          supported.versions=10-17
+          supported.patchlevels=
+          supported.vendorpatchlevels=
+          '; } # end properties
 
-### AnyKernel install
-## boot files attributes
-boot_attributes() {
-set_perm_recursive 0 0 755 644 $RAMDISK/*;
-set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
-} # end attributes
+          ### AnyKernel install
+          ## boot files attributes
+          boot_attributes() {
+          set_perm_recursive 0 0 755 644 $RAMDISK/*;
+          set_perm_recursive 0 0 750 750 $RAMDISK/init* $RAMDISK/sbin;
+          } # end attributes
 
-# boot shell variables
-BLOCK=/dev/block/bootdevice/by-name/boot;
-IS_SLOT_DEVICE=1;
-RAMDISK_COMPRESSION=auto;
-PATCH_VBMETA_FLAG=auto;
+          # boot shell variables
+          BLOCK=/dev/block/bootdevice/by-name/boot;
+          IS_SLOT_DEVICE=1;
+          RAMDISK_COMPRESSION=auto;
+          PATCH_VBMETA_FLAG=auto;
 
-# import functions/variables and setup patching - see for reference (DO NOT REMOVE)
-. tools/ak3-core.sh;
+          # import functions/variables and setup patching - see for reference (DO NOT REMOVE)
+          . tools/ak3-core.sh;
 
-# boot install
-dump_boot;
+          # boot install
+          dump_boot;
 
-write_boot;
-## end boot install
-EOF
+          write_boot;
+          ## end boot install
+          EOF
 
           cp artifacts/Image.gz-dtb anykernel/Image.gz-dtb
 
