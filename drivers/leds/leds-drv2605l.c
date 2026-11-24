@@ -533,7 +533,7 @@ static void vibrator_enable(struct led_classdev *cdev, int value)
 			__pm_stay_awake(pDrv2605Ldata->wklock);
 		}
 #if 1	/*use RTP vibrator*/
-		drv2605L_set_rtp_val(pDrv2605Ldata, 0x7f);
+		drv2605L_set_rtp_val(pDrv2605Ldata, 0x4c);
 		//drv2605L_reg_write(pDrv2605Ldata,0x17,0x3E);  // modify OD_CLAMP to control voltage
 		drv2605L_reg_write(pDrv2605Ldata,0x1b,0x96); //control output Waveform frequency
 		drv2605L_change_mode(pDrv2605Ldata, WORK_RTP, DEV_READY);
@@ -1160,7 +1160,7 @@ static void dev_init_platform_data(struct drv2605L_data *pDrv2605Ldata)
 		if(pDrv2605Platdata->RTPFormat == Signed)
 		{
 			temp |= RTP_FORMAT_SIGNED;
-			drv2605L_reg_write(pDrv2605Ldata, REAL_TIME_PLAYBACK_REG, 0x7f);
+			drv2605L_reg_write(pDrv2605Ldata, REAL_TIME_PLAYBACK_REG, 0x4c);
 		}
 		else
 		{
