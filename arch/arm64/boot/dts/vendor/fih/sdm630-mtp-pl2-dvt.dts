@@ -29,6 +29,12 @@
 	fih,hw-id = <3 2 0>;
 };
 
+&i2c_6 {
+	nq@28 {
+		status = "disabled";
+	};
+};
+
 &i2c_7 {
 
 	tas2557@4c {
