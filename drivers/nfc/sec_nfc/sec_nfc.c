@@ -667,7 +667,7 @@ static int sec_nfc_suspend(struct device *dev)
 	mutex_lock(&info->mutex);
 
 	if (info->mode == SEC_NFC_MODE_BOOTLOADER)
-		ret = -EPERM;
+		sec_nfc_set_mode(info, SEC_NFC_MODE_OFF);
 
 	mutex_unlock(&info->mutex);
 
