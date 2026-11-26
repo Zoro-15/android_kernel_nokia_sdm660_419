@@ -3875,34 +3875,6 @@ void mdss_panelinfo_to_fb_var(struct mdss_panel_info *pinfo,
 	if (pinfo->physical_height)
 		var->height = pinfo->physical_height;
 
-#if defined(CONFIG_FIH_SDM630_SDM660_PROJS)
-	//SW4-HL-Display-CTS_Xdpi_Ydpi-00+{_20151112
-	if (pinfo->physical_width_full)
-	{
-		var->width = pinfo->physical_width_full;
-	}
-	else
-	{
-		if (pinfo->physical_width)
-		{
-			var->width = pinfo->physical_width;
-		}
-	}
-
-	if (pinfo->physical_height_full)
-	{
-		var->height = pinfo->physical_height_full;
-	}
-	else
-	{
-		if (pinfo->physical_height)
-		{
-			var->height = pinfo->physical_height;
-		}
-	}
-	//SW4-HL-Display-CTS_Xdpi_Ydpi-00+}_20151112
-#endif
-
 	pr_debug("ScreenInfo: res=%dx%d [%d, %d] [%d, %d]\n",
 		var->xres, var->yres, var->left_margin,
 		var->right_margin, var->upper_margin,
